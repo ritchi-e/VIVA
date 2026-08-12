@@ -1,0 +1,72 @@
+{
+  "provider": "mock",
+  "question_quality": [
+    {
+      "id": "ml-xgboost",
+      "grounded": true,
+      "expected_category": "methodology",
+      "question": "Why did you choose this approach for the problem described in your submission?",
+      "latency_ms": 0.01
+    },
+    {
+      "id": "se-monolith",
+      "grounded": true,
+      "expected_category": "defense",
+      "question": "Why did you choose this approach for the problem described in your submission?",
+      "latency_ms": 0.0
+    },
+    {
+      "id": "ds-avl",
+      "grounded": true,
+      "expected_category": "implementation",
+      "question": "Why did you choose this approach for the problem described in your submission?",
+      "latency_ms": 0.0
+    }
+  ],
+  "retrieval": [
+    {
+      "id": "ml-xgboost",
+      "hit_at_1": true,
+      "top_index": 0
+    },
+    {
+      "id": "se-monolith",
+      "hit_at_1": true,
+      "top_index": 1
+    },
+    {
+      "id": "ds-avl",
+      "hit_at_1": true,
+      "top_index": 2
+    }
+  ],
+  "answer_evaluation": [
+    {
+      "id": "ml-xgboost",
+      "overall": 7.25,
+      "in_expected_band": true,
+      "requires_follow_up": true
+    },
+    {
+      "id": "se-monolith",
+      "overall": 7.25,
+      "in_expected_band": true,
+      "requires_follow_up": true
+    },
+    {
+      "id": "ds-avl",
+      "overall": 7.25,
+      "in_expected_band": true,
+      "requires_follow_up": true
+    }
+  ],
+  "system_performance": {
+    "cases": 3,
+    "total_latency_ms": 26.04,
+    "avg_latency_ms": 8.68,
+    "failure_count": 0,
+    "failure_rate": 0.0,
+    "estimated_cost_usd": 0.0,
+    "notes": "Results from deterministic mock provider; not comparable to production LLM quality."
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "description": "Synthetic evaluation dataset for AI Viva (fictional educational content).",
+  "cases": [
+    {
+      "id": "ml-xgboost",
+      "submission_excerpt": "We selected XGBoost because it performed better on validation F1 for the churn dataset after normalizing features.",
+      "must_mention": ["XGBoost", "approach", "submission"],
+      "expected_category": "methodology",
+      "query": "Why choose XGBoost?",
+      "chunks": [
+        "We selected XGBoost because it performed better on validation F1.",
+        "The user interface uses React and Tailwind.",
+        "Office hours are on Tuesdays."
+      ],
+      "relevant_chunk_index": 0,
+      "sample_answer": "We chose XGBoost after comparing F1 scores against logistic regression on a held-out validation set.",
+      "expected_score_band": [6, 9]
+    },
+    {
+      "id": "se-monolith",
+      "submission_excerpt": "We used a modular monolith with Django REST Framework instead of microservices.",
+      "must_mention": ["monolith", "approach", "submission"],
+      "expected_category": "defense",
+      "query": "Why modular monolith?",
+      "chunks": [
+        "Celery workers process document extraction asynchronously.",
+        "We used a modular monolith with Django REST Framework instead of microservices.",
+        "The cafeteria menu includes pasta."
+      ],
+      "relevant_chunk_index": 1,
+      "sample_answer": "A modular monolith keeps deployment simple while preserving clear domain boundaries until scale demands services.",
+      "expected_score_band": [6, 9]
+    },
+    {
+      "id": "ds-avl",
+      "submission_excerpt": "AVL rotations LL RR LR RL keep tree height logarithmic after inserts and deletes.",
+      "must_mention": ["AVL", "rotation", "submission"],
+      "expected_category": "implementation",
+      "query": "How do AVL rotations work?",
+      "chunks": [
+        "Gradient boosting builds trees sequentially.",
+        "JWT tokens expire after thirty minutes.",
+        "AVL rotations LL RR LR RL keep tree height logarithmic after inserts and deletes."
+      ],
+      "relevant_chunk_index": 2,
+      "sample_answer": "Each node stores height; after updates we rotate to restore the balance factor within [-1, 1].",
+      "expected_score_band": [6, 9]
+    }
+  ]
+}

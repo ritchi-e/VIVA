@@ -1,0 +1,126 @@
+import { Link, useParams } from 'react-router-dom'
+import { vivaApi } from '@/lib/api'
+import { useAsync } from '@/hooks/useAsync'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { Card, CardBody } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import { LoadingPanel } from '@/components/ui/Spinner'
+import { ErrorState } from '@/components/layout/StateViews'
+import { formatDate, formatScore } from '@/lib/utils'
+
+export function VivaSessionDetailPage() {
+  const { id = '' } = useParams()
+  const session = useAsync(() => vivaApi.get(id).then((r) => r.data), [id])
+  const questions = useAsync(() => vivaApi.questions(id), [id])
+
+  if (session.loading) return <LoadingPanel />
+  if (session.error || !session.data) {
+    return <ErrorState message={session.error ?? 'Session not found'} onRetry={session.reload} />
+  }
+
+  const s = session.data
+
+  return (
+    <div>
+      <PageHeader
+        title={s.assignment_title || 'Viva session'}
+        description={`${s.student_name || s.student_email} · ${s.state} · ${s.mode}`}
+        actions={
+          <Link to={`/submissions/${s.submission}`} className="text-sm text-blue-700 hover:underline">
+            View submission
+          </Link>
+        }
+      />
+      <Card className="mb-6">
+        <CardBody className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+          <p>
+            Student:{' '}
+            <Link to={`/students/${s.student}`} className="text-blue-700 hover:underline">
+              {s.student_name || s.student_email}
+            </Link>
+          </p>
+          <p>
+            Assignment:{' '}
+            <Link to={`/assignments/${s.assignment}`} className="text-blue-700 hover:underline">
+              {s.assignment_title || s.assignment}
+            </Link>
+          </p>
+          <p>Started: {formatDate(s.started_at)}</p>
+          <p>Completed: {formatDate(s.completed_at)}</p>
+          <p>
+            Progress: {s.questions_asked}/{s.question_budget} questions
+          </p>
+          <p>Time limit: {Math.round(s.time_limit_seconds / 60)} min</p>
+          <p>
+            State: <Badge>{s.state}</Badge>
+          </p>
+          {s.error_message ? <p className="text-red-600 sm:col-span-2">{s.error_message}</p> : null}
+        </CardBody>
+      </Card>
+
+      <h2 className="mb-3 text-lg font-semibold">Viva dialogue</h2>
+      {questions.loading ? <LoadingPanel label="Loading questions…" /> : null}
+      {questions.error ? <ErrorState message={questions.error} onRetry={questions.reload} /> : null}
+      <div className="space-y-4">
+        {questions.data?.map((q) => {
+          const answer = q.student_answer
+          const evaluation = answer?.evaluation
+          return (
+            <Card key={q.id}>
+              <CardBody className="space-y-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>Q{q.sequence}</Badge>
+                    <span className="text-xs uppercase tracking-wide text-slate-500">
+                      {q.question_type.replace(/_/g, ' ')}
+                    </span>
+                    <span className="text-xs text-slate-400">{formatDate(q.asked_at)}</span>
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-slate-900">{q.question_text}</p>
+                  {q.concept ? <p className="mt-1 text-xs text-slate-500">Focus: {q.concept}</p> : null}
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Student answer</p>
+                  {answer?.text ? (
+                    <>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">{answer.text}</p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        Via {answer.input_mode === 'voice' ? 'voice' : 'text'} · {formatDate(answer.submitted_at)}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-500">No answer recorded for this question.</p>
+                  )}
+                </div>
+
+                {evaluation ? (
+                  <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-blue-700">AI evaluation</p>
+                      <p className="text-sm font-semibold text-blue-900">
+                        Overall {formatScore(evaluation.overall)} / 10
+                      </p>
+                    </div>
+                    {evaluation.explanation ? (
+                      <p className="mt-2 text-sm text-slate-700">{evaluation.explanation}</p>
+                    ) : null}
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600 sm:grid-cols-4">
+                      <p>Accuracy: {formatScore(evaluation.conceptual_accuracy)}</p>
+                      <p>Evidence: {formatScore(evaluation.evidence_support)}</p>
+                      <p>Depth: {formatScore(evaluation.depth)}</p>
+                      <p>Relevance: {formatScore(evaluation.relevance)}</p>
+                    </div>
+                    {evaluation.requires_follow_up ? (
+                      <p className="mt-2 text-xs font-medium text-amber-700">Follow-up was requested</p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </CardBody>
+            </Card>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

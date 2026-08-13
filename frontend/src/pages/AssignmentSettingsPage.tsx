@@ -7,7 +7,8 @@ import { Card, CardBody } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
 
 function toLocalInput(iso: string | null | undefined) {
@@ -51,7 +52,7 @@ export function AssignmentSettingsPage() {
     setQuestionBudget(Number.isFinite(budget) && budget > 0 ? budget : 8)
   }, [data])
 
-  if (loading) return <LoadingPanel />
+  if (loading) return <ProgressPanel copy={PLATFORM_PROGRESS.assignments} />
   if (error || !data) return <ErrorState message={error ?? 'Not found'} onRetry={reload} />
 
   const onSubmit = async (e: FormEvent) => {

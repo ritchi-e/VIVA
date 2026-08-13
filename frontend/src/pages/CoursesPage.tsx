@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { EmptyState, ErrorState } from '@/components/layout/StateViews'
 
 export function CoursesPage() {
@@ -75,7 +76,7 @@ export function CoursesPage() {
           </CardBody>
         </Card>
       ) : null}
-      {loading ? <LoadingPanel /> : null}
+      {loading ? <ProgressPanel copy={PLATFORM_PROGRESS.courses} /> : null}
       {error ? <ErrorState message={error} onRetry={reload} /> : null}
       {!loading && !error && data?.length === 0 ? (
         <EmptyState title="No courses yet" description="Create a course to start publishing assignments." />

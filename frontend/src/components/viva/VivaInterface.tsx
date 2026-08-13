@@ -15,7 +15,8 @@ import {
 } from '@/lib/browserTts'
 import { enterFullscreen, exitFullscreen } from '@/lib/fullscreen'
 import type { VivaExcerpt, VivaWsMessage } from '@/types'
-import { VivaOrb, phaseLabel, type VivaPhase } from '@/components/viva/VivaOrb'
+import { VivaOrb, phaseCopy, useRotatingDetail, type VivaPhase } from '@/components/viva/VivaOrb'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { cn } from '@/lib/utils'
 
 const SILENCE_MS = 2500
@@ -568,6 +569,21 @@ export function VivaInterface({
   const showBeginButton = !initialComplete && !audioStarted && phase !== 'complete'
   const immersive = !initialComplete
   const blockCopy = immersive && phase !== 'complete'
+  const activePhase = showBeginButton ? 'connecting' : phase
+  const copy = finishing ? PLATFORM_PROGRESS.finishingViva : phaseCopy(activePhase)
+  const rotating = useRotatingDetail(
+    finishing || showBeginButton ? undefined : phaseCopy(phase).rotating,
+  )
+  const statusTitle = finishing
+    ? PLATFORM_PROGRESS.finishingViva.title
+    : showBeginButton
+      ? 'Ready when you are'
+      : copy.title
+  const statusDetail = finishing
+    ? PLATFORM_PROGRESS.finishingViva.detail
+    : showBeginButton
+      ? 'Choose a voice, then begin. The viva opens fullscreen so you can focus.'
+      : rotating ?? copy.detail
 
   const preventCopy = useCallback((event: ClipboardEvent | MouseEvent | DragEvent) => {
     if (!blockCopy) return
@@ -583,59 +599,70 @@ export function VivaInterface({
       onContextMenu={preventCopy}
       onDragStart={preventCopy}
       className={cn(
-        'relative overflow-hidden bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-900 text-white',
+        'relative overflow-hidden bg-[radial-gradient(ellipse_at_top,_#0f2f2c_0%,_#071018_45%,_#05080c_100%)] text-white',
         immersive
           ? 'fixed inset-0 z-[200] min-h-dvh w-full'
           : 'min-h-[calc(100vh-8rem)] rounded-3xl shadow-2xl',
       )}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-20 top-10 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
-        <div className="absolute -right-16 bottom-20 h-72 w-72 rounded-full bg-violet-500/20 blur-3xl" />
-        <div className="absolute left-1/3 top-1/2 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-teal-500/15 blur-3xl" />
+        <div className="absolute -right-20 bottom-10 h-80 w-80 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="absolute left-1/2 top-1/3 h-56 w-56 -translate-x-1/2 rounded-full bg-emerald-400/8 blur-3xl" />
       </div>
 
       <div className="relative z-10 flex min-h-dvh flex-col items-center px-4 py-8 sm:px-8">
-        {audioStarted && !showBeginButton && phase !== 'complete' ? (
-          <button
-            type="button"
-            disabled={finishing}
-            onClick={() => void finishViva()}
-            className="absolute right-4 top-4 z-20 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium text-white/80 backdrop-blur transition hover:bg-white/20 disabled:opacity-50"
-          >
-            {finishing ? 'Finishing…' : 'Finish viva'}
-          </button>
-        ) : null}
+        <div className="mb-8 flex w-full max-w-xl items-center justify-between">
+          <p className="font-display text-sm font-semibold tracking-tight text-white/80">AI Viva</p>
+          {audioStarted && !showBeginButton && phase !== 'complete' ? (
+            <button
+              type="button"
+              disabled={finishing}
+              onClick={() => void finishViva()}
+              className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-medium text-white/75 backdrop-blur transition hover:bg-white/10 disabled:opacity-50"
+            >
+              {finishing ? 'Closing session…' : 'End viva'}
+            </button>
+          ) : (
+            <span className="text-xs text-white/40">Oral assessment</span>
+          )}
+        </div>
 
-        <div className="mb-2 w-full max-w-xl text-xs text-white/50">
+        <div className="mb-2 flex w-full max-w-xl items-end justify-between text-xs text-white/45">
           <span>
             Question {sequence ?? '—'} of {questionBudget}
           </span>
+          <span>{progress}%</span>
         </div>
 
-        <div className="mb-6 w-full max-w-xl">
-          <div className="h-1 overflow-hidden rounded-full bg-white/10">
+        <div className="mb-8 w-full max-w-xl">
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-400 transition-all duration-700"
+              className="h-full rounded-full bg-gradient-to-r from-teal-400 via-cyan-400 to-emerald-400 transition-all duration-700"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
 
-        <VivaOrb phase={showBeginButton ? 'connecting' : phase} />
+        <VivaOrb phase={activePhase} />
 
-        <p className="mt-6 text-center text-lg font-medium tracking-tight text-white/90">
-          {finishing
-            ? 'Submitting your viva…'
-            : showBeginButton
-              ? 'Tap below to begin — the viva will open fullscreen'
-              : phaseLabel(phase)}
-        </p>
+        <div className="mt-7 max-w-lg text-center animate-viva-fade-up" key={statusTitle}>
+          <p className="font-display text-xl font-semibold tracking-tight text-white sm:text-2xl">
+            {statusTitle}
+          </p>
+          {statusDetail ? (
+            <p className="mt-2 text-sm leading-relaxed text-white/55 transition-opacity duration-500">
+              {statusDetail}
+            </p>
+          ) : null}
+        </div>
 
         {showBeginButton ? (
-          <div className="mt-8 flex w-full max-w-lg flex-col items-stretch gap-4">
+          <div className="mt-10 flex w-full max-w-lg flex-col items-stretch gap-5 animate-viva-fade-up">
             <div>
-              <p className="mb-3 text-center text-sm text-white/60">Choose examiner voice</p>
+              <p className="mb-3 text-center text-xs font-medium uppercase tracking-[0.14em] text-white/45">
+                Examiner voice
+              </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {EXAMINER_VOICE_OPTIONS.map((option) => {
                   const active = selectedVoice === option.id
@@ -648,14 +675,14 @@ export function VivaInterface({
                         selectedVoiceRef.current = option.id
                       }}
                       className={cn(
-                        'rounded-xl border px-3 py-3 text-left transition',
+                        'rounded-2xl border px-4 py-3.5 text-left transition',
                         active
-                          ? 'border-cyan-400/60 bg-cyan-500/15'
-                          : 'border-white/10 bg-white/5 hover:bg-white/10',
+                          ? 'border-teal-400/50 bg-teal-500/15 shadow-[0_0_24px_rgba(45,212,191,0.12)]'
+                          : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.07]',
                       )}
                     >
-                      <p className="text-sm font-medium text-white">{option.label}</p>
-                      <p className="mt-0.5 text-xs text-white/50">{option.description}</p>
+                      <p className="text-sm font-semibold text-white">{option.label}</p>
+                      <p className="mt-0.5 text-xs text-white/45">{option.description}</p>
                     </button>
                   )
                 })}
@@ -669,15 +696,15 @@ export function VivaInterface({
                     setPreviewingVoice(null),
                   )
                 }}
-                className="mt-3 w-full rounded-full border border-white/15 bg-white/5 py-2 text-xs font-medium text-white/70 hover:bg-white/10 disabled:opacity-50"
+                className="mt-3 w-full rounded-full border border-white/12 bg-white/[0.04] py-2.5 text-xs font-medium text-white/65 hover:bg-white/[0.08] disabled:opacity-50"
               >
-                {previewingVoice === selectedVoice ? 'Playing preview…' : 'Preview voice'}
+                {previewingVoice === selectedVoice ? 'Playing a short sample…' : 'Preview voice'}
               </button>
             </div>
             <button
               type="button"
               onClick={() => void beginSession()}
-              className="rounded-full bg-gradient-to-r from-cyan-500 to-violet-500 px-8 py-3 text-sm font-semibold text-white shadow-lg transition hover:opacity-90"
+              className="rounded-full bg-gradient-to-r from-teal-500 to-cyan-600 px-8 py-3.5 font-display text-sm font-semibold text-white shadow-[0_12px_40px_rgba(20,184,166,0.35)] transition hover:brightness-110"
             >
               Begin viva
             </button>
@@ -685,22 +712,22 @@ export function VivaInterface({
         ) : null}
 
         {phase === 'listening' && liveTranscript ? (
-          <p className="mt-3 max-w-md text-center text-sm text-white/60 italic">{liveTranscript}</p>
+          <p className="mt-4 max-w-md text-center text-sm italic text-teal-100/70">{liveTranscript}</p>
         ) : null}
 
         {excerpt?.quote && phase !== 'complete' ? (
           <div
-            className="mt-8 w-full max-w-xl select-none rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm"
+            className="mt-8 w-full max-w-xl select-none rounded-2xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-sm"
             onCopy={preventCopy}
             onCut={preventCopy}
             onContextMenu={preventCopy}
             onDragStart={preventCopy}
           >
-            <p className="text-xs font-medium uppercase tracking-wider text-white/45">
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-teal-200/50">
               From your submission{excerpt.source_ref ? ` · ${excerpt.source_ref}` : ''}
             </p>
             <pre
-              className="mt-3 max-h-40 overflow-y-auto whitespace-pre-wrap font-mono text-sm leading-relaxed text-white/85 select-none"
+              className="mt-3 max-h-40 overflow-y-auto whitespace-pre-wrap font-sans text-sm leading-relaxed text-white/80 select-none"
               style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
               onCopy={preventCopy}
               onCut={preventCopy}
@@ -713,32 +740,32 @@ export function VivaInterface({
         ) : null}
 
         {phase === 'complete' ? (
-          <div className="mt-8 text-center">
-            <p className="text-sm text-white/70">
-              Your answers are being evaluated. Your instructor will review the assessment.
+          <div className="mt-8 max-w-md text-center animate-viva-fade-up">
+            <p className="text-sm leading-relaxed text-white/60">
+              Your answers are saved. An assessment draft will be prepared for your instructor.
             </p>
             <Link
               to={`/student/results/${sessionId}`}
-              className="mt-4 inline-block rounded-full bg-white/10 px-6 py-2 text-sm font-medium text-white backdrop-blur hover:bg-white/20"
+              className="mt-5 inline-block rounded-full border border-teal-400/30 bg-teal-500/15 px-6 py-2.5 text-sm font-semibold text-teal-50 backdrop-blur hover:bg-teal-500/25"
             >
-              View results →
+              View results
             </Link>
           </div>
         ) : null}
 
         {error ? (
-          <p className="mt-6 max-w-md text-center text-sm text-red-300">{error}</p>
+          <p className="mt-6 max-w-md text-center text-sm text-rose-300">{error}</p>
         ) : null}
 
         {!speechSupported && phase !== 'complete' ? (
-          <p className="mt-4 max-w-md text-center text-xs text-amber-200/80">
-            This viva requires Chrome or Edge with speech recognition enabled.
+          <p className="mt-4 max-w-md text-center text-xs text-amber-100/70">
+            This viva works best in Chrome or Edge with speech recognition enabled.
           </p>
         ) : null}
 
         {!ttsSupported && phase !== 'complete' ? (
-          <p className="mt-4 max-w-md text-center text-xs text-amber-200/80">
-            Text-to-speech is not available in this browser.
+          <p className="mt-4 max-w-md text-center text-xs text-amber-100/70">
+            Voice playback is not available in this browser.
           </p>
         ) : null}
       </div>

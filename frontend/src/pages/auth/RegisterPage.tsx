@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
-import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/context/AuthContext'
 import { getApiErrorMessage } from '@/lib/api'
@@ -40,11 +39,23 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
-      <Card className="w-full max-w-lg">
-        <CardHeader title="Create your workspace" description="Set up AI Viva for your organization" />
-        <CardBody>
-          <form className="space-y-4" onSubmit={onSubmit}>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-20 top-10 h-80 w-80 rounded-full bg-teal-400/20 blur-3xl" />
+        <div className="absolute -right-16 bottom-0 h-72 w-72 rounded-full bg-cyan-400/15 blur-3xl" />
+      </div>
+      <div className="relative w-full max-w-lg animate-viva-fade-up">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-cyan-700 font-display text-sm font-bold text-white shadow-lg shadow-teal-700/25">
+            AV
+          </div>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-900">AI Viva</h1>
+          <p className="mt-2 text-sm text-slate-500">Create a workspace for oral assessment</p>
+        </div>
+        <div className="rounded-2xl border border-[var(--color-border)] bg-white/90 p-6 shadow-xl shadow-slate-900/5 backdrop-blur-sm sm:p-8">
+          <h2 className="font-display text-lg font-semibold text-slate-900">Create your account</h2>
+          <p className="mt-1 text-sm text-slate-500">Instructors and students share one platform</p>
+          <form className="mt-6 space-y-4" onSubmit={onSubmit}>
             <Input label="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
             <Input
               label="Email"
@@ -73,7 +84,7 @@ export function RegisterPage() {
               </label>
               <select
                 id="role"
-                className="w-full rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
               >
@@ -87,14 +98,14 @@ export function RegisterPage() {
               Create account
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-slate-500">
+          <p className="mt-5 text-center text-sm text-slate-500">
             Already have an account?{' '}
-            <Link className="font-medium text-blue-700 hover:underline" to="/login">
+            <Link className="font-medium text-teal-800 hover:underline" to="/login">
               Sign in
             </Link>
           </p>
-        </CardBody>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

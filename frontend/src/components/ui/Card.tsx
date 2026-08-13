@@ -11,7 +11,7 @@ export function Card({
   return (
     <div
       className={cn(
-        'rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] shadow-sm',
+        'rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] shadow-sm shadow-slate-900/[0.03]',
         className,
       )}
     >
@@ -32,7 +32,7 @@ export function CardHeader({
   return (
     <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] px-5 py-4">
       <div>
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+        <h2 className="font-display text-base font-semibold tracking-tight text-slate-900">{title}</h2>
         {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
       </div>
       {action}

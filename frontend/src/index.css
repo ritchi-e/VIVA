@@ -1,16 +1,19 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --color-surface: #f8fafc;
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Sora', 'Manrope', ui-sans-serif, system-ui, sans-serif;
+
+  --color-surface: #f1f4f6;
   --color-surface-elevated: #ffffff;
-  --color-border: #e2e8f0;
-  --color-muted: #64748b;
-  --color-foreground: #0f172a;
-  --color-primary: #1e40af;
-  --color-primary-hover: #1d4ed8;
-  --color-danger: #b91c1c;
-  --color-success: #15803d;
+  --color-border: #dbe3ea;
+  --color-muted: #5b6b7c;
+  --color-foreground: #0b1520;
+  --color-primary: #0f766e;
+  --color-primary-hover: #0d9488;
+  --color-danger: #b42318;
+  --color-success: #067647;
+  --color-accent: #0e7490;
 }
 
 @layer base {
@@ -20,9 +23,150 @@
 
   body {
     @apply bg-[var(--color-surface)] text-[var(--color-foreground)] font-sans;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 0% -10%, rgba(15, 118, 110, 0.08), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(14, 116, 144, 0.06), transparent);
+    min-height: 100dvh;
   }
 
   * {
     @apply border-[var(--color-border)];
+  }
+
+  h1,
+  h2,
+  .font-display {
+    font-family: var(--font-display);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  @keyframes viva-breathe {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    50% {
+      transform: scale(1.08);
+      opacity: 0.85;
+    }
+  }
+
+  @keyframes viva-orbit {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes viva-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-viva-breathe {
+    animation: viva-breathe 3.2s ease-in-out infinite;
+  }
+
+  .animate-viva-orbit {
+    animation: viva-orbit 14s linear infinite;
+  }
+
+  .animate-viva-orbit-rev {
+    animation: viva-orbit 22s linear infinite reverse;
+  }
+
+  .animate-viva-fade-up {
+    animation: viva-fade-up 0.45s ease-out both;
+  }
+
+  @keyframes viva-scan {
+    0%,
+    100% {
+      transform: translateY(-42%);
+      opacity: 0.15;
+    }
+    50% {
+      transform: translateY(42%);
+      opacity: 0.9;
+    }
+  }
+
+  @keyframes viva-ring-dash {
+    to {
+      stroke-dashoffset: -220;
+    }
+  }
+
+  @keyframes viva-arc-spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes viva-node-pulse {
+    0%,
+    100% {
+      opacity: 0.2;
+      transform: scale(0.75);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes viva-core-glow {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 0 rgba(45, 212, 191, 0.15),
+        0 0 28px rgba(45, 212, 191, 0.35);
+    }
+    50% {
+      box-shadow:
+        0 0 0 14px rgba(45, 212, 191, 0),
+        0 0 42px rgba(34, 211, 238, 0.5);
+    }
+  }
+
+  .animate-viva-scan {
+    animation: viva-scan 2.4s ease-in-out infinite;
+  }
+
+  .animate-viva-ring-dash {
+    animation: viva-ring-dash 8s linear infinite;
+  }
+
+  .animate-viva-arc-spin {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: viva-arc-spin 3.6s linear infinite;
+  }
+
+  .animate-viva-node-pulse {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: viva-node-pulse 1.8s ease-in-out infinite;
+  }
+
+  .animate-viva-core-glow {
+    animation: viva-core-glow 2.2s ease-in-out infinite;
   }
 }

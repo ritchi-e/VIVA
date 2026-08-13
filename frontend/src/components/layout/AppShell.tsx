@@ -42,12 +42,14 @@ function NavItems({ items }: { items: NavItem[] }) {
           to={item.to}
           className={({ isActive }) =>
             cn(
-              'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
-              isActive ? 'bg-blue-50 text-blue-900' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+              'flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition',
+              isActive
+                ? 'bg-teal-50 text-teal-900 shadow-sm ring-1 ring-teal-100'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
             )
           }
         >
-          <item.icon className="h-4 w-4 shrink-0" />
+          <item.icon className="h-4 w-4 shrink-0 opacity-80" />
           {item.label}
         </NavLink>
       ))}
@@ -66,24 +68,32 @@ export function AppShell({ variant }: { variant: 'instructor' | 'student' }) {
         : instructorNav
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
-      <aside className="border-r border-[var(--color-border)] bg-white">
-        <div className="flex h-14 items-center border-b border-[var(--color-border)] px-4">
-          <span className="text-sm font-semibold tracking-tight text-slate-900">AI Viva</span>
+    <div className="min-h-screen lg:grid lg:grid-cols-[248px_1fr]">
+      <aside className="border-r border-[var(--color-border)] bg-white/90 backdrop-blur-sm">
+        <div className="flex h-16 items-center gap-2.5 border-b border-[var(--color-border)] px-5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-cyan-700 text-[11px] font-bold text-white shadow-sm">
+            AV
+          </span>
+          <div>
+            <p className="font-display text-sm font-semibold tracking-tight text-slate-900">AI Viva</p>
+            <p className="text-[11px] text-slate-500">
+              {variant === 'student' ? 'Student' : 'Instructor'}
+            </p>
+          </div>
         </div>
         <div className="p-3">
           <NavItems items={nav} />
         </div>
       </aside>
       <div className="flex min-h-screen flex-col">
-        <header className="flex h-14 items-center justify-between border-b border-[var(--color-border)] bg-white px-4 sm:px-6">
-          <div className="text-sm text-slate-500">
+        <header className="flex h-16 items-center justify-between border-b border-[var(--color-border)] bg-white/80 px-4 backdrop-blur-sm sm:px-6">
+          <div className="text-sm font-medium text-slate-600">
             {activeMembership?.organization_name ?? 'Organization'}
           </div>
           <div className="flex items-center gap-3">
             {memberships.length > 1 ? (
               <select
-                className="rounded-lg border border-[var(--color-border)] bg-white px-2 py-1.5 text-sm"
+                className="rounded-xl border border-[var(--color-border)] bg-white px-2.5 py-1.5 text-sm"
                 value={activeMembership?.organization ?? ''}
                 onChange={(e) => {
                   const m = memberships.find((x) => x.organization === e.target.value)
@@ -102,7 +112,7 @@ export function AppShell({ variant }: { variant: 'instructor' | 'student' }) {
             </span>
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+              className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100"
               onClick={() => {
                 logout()
                 navigate('/login')
@@ -113,7 +123,7 @@ export function AppShell({ variant }: { variant: 'instructor' | 'student' }) {
             </button>
           </div>
         </header>
-        <main className="flex-1 px-4 py-6 sm:px-6">
+        <main className="flex-1 px-4 py-7 sm:px-6">
           <Outlet />
         </main>
       </div>

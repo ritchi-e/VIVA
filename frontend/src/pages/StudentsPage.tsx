@@ -3,7 +3,8 @@ import { studentsApi } from '@/lib/api'
 import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { EmptyState, ErrorState } from '@/components/layout/StateViews'
 
 export function StudentsPage() {
@@ -12,7 +13,7 @@ export function StudentsPage() {
   return (
     <div>
       <PageHeader title="Students" description="Learners enrolled in your organization." />
-      {loading ? <LoadingPanel /> : null}
+      {loading ? <ProgressPanel copy={PLATFORM_PROGRESS.students} /> : null}
       {error ? <ErrorState message={error} onRetry={reload} /> : null}
       {!loading && !error && data?.length === 0 ? (
         <EmptyState title="No students" description="Invite students to your organization to see them here." />

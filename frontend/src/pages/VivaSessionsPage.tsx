@@ -4,7 +4,8 @@ import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { EmptyState, ErrorState } from '@/components/layout/StateViews'
 import { formatDate } from '@/lib/utils'
 
@@ -14,7 +15,7 @@ export function VivaSessionsPage() {
   return (
     <div>
       <PageHeader title="Viva sessions" description="Oral defense sessions across assignments." />
-      {loading ? <LoadingPanel /> : null}
+      {loading ? <ProgressPanel copy={PLATFORM_PROGRESS.vivaList} /> : null}
       {error ? <ErrorState message={error} onRetry={reload} /> : null}
       {!loading && !error && data?.length === 0 ? (
         <EmptyState title="No viva sessions" description="Sessions are created when students start a viva." />

@@ -5,7 +5,8 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
 import { formatDate } from '@/lib/utils'
 
@@ -14,7 +15,7 @@ export function AssignmentDetailPage() {
   const { data, loading, error, reload } = useAsync(() => assignmentsApi.get(id).then((r) => r.data), [id])
   const submissions = useAsync(() => submissionsApi.list({ assignment: id }), [id])
 
-  if (loading) return <LoadingPanel />
+  if (loading) return <ProgressPanel copy={PLATFORM_PROGRESS.assignments} />
   if (error || !data) return <ErrorState message={error ?? 'Not found'} onRetry={reload} />
 
   return (
@@ -57,7 +58,7 @@ export function AssignmentDetailPage() {
       <Card>
         <CardBody>
           <h2 className="mb-3 text-sm font-semibold text-slate-900">Recent submissions</h2>
-          {submissions.loading ? <LoadingPanel /> : null}
+          {submissions.loading ? <ProgressPanel copy={PLATFORM_PROGRESS.submissions} /> : null}
           {!submissions.loading && (submissions.data?.length ?? 0) === 0 ? (
             <p className="text-sm text-slate-600">No submissions yet.</p>
           ) : (

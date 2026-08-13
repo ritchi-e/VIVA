@@ -7,7 +7,8 @@ import { Card, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { EmptyState, ErrorState } from '@/components/layout/StateViews'
 
 export function AssignmentRubricPage() {
@@ -89,7 +90,7 @@ export function AssignmentRubricPage() {
   return (
     <div>
       <PageHeader title="Assignment rubric" description="Criteria used for AI and instructor scoring." />
-      {loading ? <LoadingPanel /> : null}
+      {loading ? <ProgressPanel copy={PLATFORM_PROGRESS.assignments} /> : null}
       {error ? <ErrorState message={error} onRetry={reload} /> : null}
       {!loading && !error && !data ? (
         <EmptyState title="No rubric configured" description="Open this page again to auto-create a rubric." />

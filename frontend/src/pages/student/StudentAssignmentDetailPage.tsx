@@ -6,9 +6,11 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
 import { ErrorState } from '@/components/layout/StateViews'
+import { PreparingVivaOverlay } from '@/components/viva/PreparingVivaOverlay'
 import { getApiErrorMessage } from '@/lib/api'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 
 export function StudentAssignmentDetailPage() {
   const { id = '' } = useParams()
@@ -24,7 +26,7 @@ export function StudentAssignmentDetailPage() {
   const [message, setMessage] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  if (assignment.loading) return <LoadingPanel />
+  if (assignment.loading) return <ProgressPanel copy={PLATFORM_PROGRESS.assignments} />
   if (assignment.error || !assignment.data) {
     return <ErrorState message={assignment.error ?? 'Not found'} onRetry={assignment.reload} />
   }
@@ -68,7 +70,7 @@ export function StudentAssignmentDetailPage() {
     }
     setStarting(true)
     setError(null)
-    setMessage('Preparing viva questions with AI. This can take up to a minute…')
+    setMessage(null)
     try {
       const response = await vivaApi.start({
         assignment: id,
@@ -77,11 +79,11 @@ export function StudentAssignmentDetailPage() {
       })
       const sessionId = response.data?.id ? String(response.data.id) : ''
       if (!sessionId || sessionId === 'undefined') {
-        setError('Viva session was created but no session id was returned. Restart backend and try again.')
+        setError('We could not open the viva room. Please try starting again.')
         return
       }
       if (response.data.state === 'FAILED') {
-        setError(response.data.error_message || 'Viva preparation failed.')
+        setError(response.data.error_message || 'Preparing your viva did not complete. Please try again.')
         return
       }
       navigate(`/student/viva/${sessionId}`)
@@ -95,6 +97,7 @@ export function StudentAssignmentDetailPage() {
 
   return (
     <div>
+      {starting ? <PreparingVivaOverlay /> : null}
       <PageHeader title={assignment.data.title} description="Submit work and start your viva when ready." />
       <Card className="mb-6">
         <CardBody className="space-y-2 text-sm text-slate-700">
@@ -166,8 +169,8 @@ export function StudentAssignmentDetailPage() {
         </Card>
       ) : null}
       {error ? <p className="mb-3 text-sm text-red-600">{error}</p> : null}
-      <Button onClick={startViva} loading={starting} disabled={!latestSubmission}>
-        {starting ? 'Preparing viva…' : 'Start viva session'}
+      <Button onClick={startViva} loading={starting} disabled={!latestSubmission || starting}>
+        Start viva session
       </Button>
     </div>
   )

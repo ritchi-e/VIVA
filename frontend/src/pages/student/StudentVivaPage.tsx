@@ -2,9 +2,9 @@ import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { vivaApi } from '@/lib/api'
 import { useAsync } from '@/hooks/useAsync'
-import { LoadingPanel } from '@/components/ui/Spinner'
 import { ErrorState } from '@/components/layout/StateViews'
 import { VivaInterface } from '@/components/viva/VivaInterface'
+import { PreparingVivaOverlay } from '@/components/viva/PreparingVivaOverlay'
 
 export function StudentVivaPage() {
   const { id = '' } = useParams()
@@ -34,7 +34,13 @@ export function StudentVivaPage() {
     })
   }, [id, data?.state])
 
-  if (loading) return <LoadingPanel />
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-[200] bg-[radial-gradient(ellipse_at_top,_#0f2f2c_0%,_#071018_45%,_#05080c_100%)]">
+        <PreparingVivaOverlay />
+      </div>
+    )
+  }
   if (error || !data) return <ErrorState message={error ?? 'Session not found'} onRetry={reload} />
 
   if (data.state === 'FAILED') {

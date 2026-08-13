@@ -4,7 +4,8 @@ import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
 import { formatDate } from '@/lib/utils'
 
@@ -13,7 +14,7 @@ export function StudentDetailPage() {
   const student = useAsync(() => studentsApi.get(id).then((r) => r.data), [id])
   const submissions = useAsync(() => submissionsApi.list({ student: id }), [id])
 
-  if (student.loading) return <LoadingPanel />
+  if (student.loading) return <ProgressPanel copy={PLATFORM_PROGRESS.students} />
   if (student.error || !student.data) {
     return <ErrorState message={student.error ?? 'Student not found'} onRetry={student.reload} />
   }
@@ -32,7 +33,7 @@ export function StudentDetailPage() {
       </Card>
 
       <h2 className="mb-3 text-lg font-semibold">Submissions</h2>
-      {submissions.loading ? <LoadingPanel /> : null}
+      {submissions.loading ? <ProgressPanel copy={PLATFORM_PROGRESS.submissions} /> : null}
       {submissions.error ? <ErrorState message={submissions.error} onRetry={submissions.reload} /> : null}
       <div className="space-y-3">
         {submissions.data?.map((sub) => (

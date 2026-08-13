@@ -4,7 +4,8 @@ import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
 import { formatDate } from '@/lib/utils'
 
@@ -20,7 +21,7 @@ export function StudentSubmissionPage() {
     [data?.id],
   )
 
-  if (loading) return <LoadingPanel />
+  if (loading) return <ProgressPanel copy={PLATFORM_PROGRESS.submissions} />
   if (error || !data) return <ErrorState message={error ?? 'Not found'} onRetry={reload} />
 
   const relatedSessions = (sessions.data || []).filter((s) => s.submission === data.id)

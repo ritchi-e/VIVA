@@ -4,7 +4,8 @@ import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { EmptyState, ErrorState } from '@/components/layout/StateViews'
 import { formatDate } from '@/lib/utils'
 
@@ -19,7 +20,7 @@ export function SubmissionsPage() {
   return (
     <div>
       <PageHeader title="Submissions" description="Student work awaiting or completed processing." />
-      {loading ? <LoadingPanel /> : null}
+      {loading ? <ProgressPanel copy={PLATFORM_PROGRESS.submissions} /> : null}
       {error ? <ErrorState message={error} onRetry={reload} /> : null}
       {!loading && !error && data?.length === 0 ? (
         <EmptyState title="No submissions" description="Submissions appear when students upload assignments." />

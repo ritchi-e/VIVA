@@ -7,7 +7,8 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
 import { formatDate } from '@/lib/utils'
 
@@ -104,7 +105,7 @@ export function AdminPage() {
         <Card>
           <CardHeader title="Organization members" />
           <CardBody className="space-y-4">
-            {memberships.loading ? <LoadingPanel /> : null}
+            {memberships.loading ? <ProgressPanel copy={PLATFORM_PROGRESS.dashboard} /> : null}
             {memberships.error ? <ErrorState message={memberships.error} onRetry={memberships.reload} /> : null}
             <form className="grid gap-3 sm:grid-cols-[1fr_180px_auto]" onSubmit={addMember}>
               <Input
@@ -195,7 +196,7 @@ export function AdminPage() {
         <Card>
           <CardHeader title="AI usage" />
           <CardBody>
-            {usage.loading ? <LoadingPanel /> : null}
+            {usage.loading ? <ProgressPanel copy={PLATFORM_PROGRESS.dashboard} /> : null}
             {usage.error ? <ErrorState message={usage.error} onRetry={usage.reload} /> : null}
             {usage.data ? (
               <div className="grid gap-4 sm:grid-cols-4">
@@ -224,7 +225,7 @@ export function AdminPage() {
       <Card>
         <CardHeader title="Audit log" />
         <CardBody>
-          {audit.loading ? <LoadingPanel /> : null}
+          {audit.loading ? <ProgressPanel copy={PLATFORM_PROGRESS.dashboard} /> : null}
           {audit.error ? <ErrorState message={audit.error} onRetry={audit.reload} /> : null}
           {entries.length > 0 ? (
             <div className="overflow-x-auto">

@@ -4,7 +4,8 @@ import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
 import { formatDate, formatScore } from '@/lib/utils'
 
@@ -13,7 +14,7 @@ export function VivaSessionDetailPage() {
   const session = useAsync(() => vivaApi.get(id).then((r) => r.data), [id])
   const questions = useAsync(() => vivaApi.questions(id), [id])
 
-  if (session.loading) return <LoadingPanel />
+  if (session.loading) return <ProgressPanel copy={PLATFORM_PROGRESS.vivaList} />
   if (session.error || !session.data) {
     return <ErrorState message={session.error ?? 'Session not found'} onRetry={session.reload} />
   }
@@ -59,7 +60,7 @@ export function VivaSessionDetailPage() {
       </Card>
 
       <h2 className="mb-3 text-lg font-semibold">Viva dialogue</h2>
-      {questions.loading ? <LoadingPanel label="Loading questions…" /> : null}
+      {questions.loading ? <ProgressPanel copy={PLATFORM_PROGRESS.questions} /> : null}
       {questions.error ? <ErrorState message={questions.error} onRetry={questions.reload} /> : null}
       <div className="space-y-4">
         {questions.data?.map((q) => {

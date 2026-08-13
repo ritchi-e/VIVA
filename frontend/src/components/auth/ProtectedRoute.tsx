@@ -1,12 +1,13 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
 import { useAuth } from '@/context/AuthContext'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 
 export function ProtectedRoute({ studentOnly = false, instructorOnly = false }) {
   const { isAuthenticated, isLoading, isStudent, isInstructor } = useAuth()
   const location = useLocation()
 
-  if (isLoading) return <LoadingPanel label="Checking session…" />
+  if (isLoading) return <ProgressPanel copy={PLATFORM_PROGRESS.session} />
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />

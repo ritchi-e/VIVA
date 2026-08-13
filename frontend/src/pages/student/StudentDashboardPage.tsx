@@ -4,7 +4,8 @@ import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { formatDate } from '@/lib/utils'
 
 export function StudentDashboardPage() {
@@ -42,7 +43,7 @@ export function StudentDashboardPage() {
 
       {(assignments.loading || submissions.loading || sessions.loading) && (
         <div className="mt-6">
-          <LoadingPanel />
+          <ProgressPanel copy={PLATFORM_PROGRESS.dashboard} />
         </div>
       )}
 

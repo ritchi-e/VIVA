@@ -5,7 +5,8 @@ import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { LoadingPanel } from '@/components/ui/Spinner'
+import { ProgressPanel } from '@/components/ui/Spinner'
+import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
 import { AssessmentReview } from '@/components/assessment/AssessmentReview'
 import type { Assessment } from '@/types'
@@ -21,7 +22,7 @@ export function SubmissionDetailPage() {
     if (assessmentQuery.data) setAssessment(assessmentQuery.data)
   }, [assessmentQuery.data])
 
-  if (submission.loading) return <LoadingPanel />
+  if (submission.loading) return <ProgressPanel copy={PLATFORM_PROGRESS.submissions} />
   if (submission.error || !submission.data) {
     return <ErrorState message={submission.error ?? 'Submission not found'} onRetry={submission.reload} />
   }
@@ -64,7 +65,7 @@ export function SubmissionDetailPage() {
         </CardBody>
       </Card>
 
-      {assessmentQuery.loading ? <LoadingPanel label="Loading assessment…" /> : null}
+      {assessmentQuery.loading ? <ProgressPanel copy={PLATFORM_PROGRESS.assessment} /> : null}
       {activeAssessment ? (
         <AssessmentReview assessment={activeAssessment} onUpdated={setAssessment} />
       ) : !assessmentQuery.loading ? (

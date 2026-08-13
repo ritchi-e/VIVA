@@ -59,6 +59,10 @@ class RumikTTSProvider(TTSProvider):
             "text": cleaned,
             "description": description,
             "speaker": speaker,
+            # Keep timbre stable across questions in one viva.
+            "temperature": 0.35,
+            "top_p": 0.9,
+            "repetition_penalty": 1.1,
             "max_new_tokens": int(kwargs.get("max_new_tokens") or 4096),
         }
 

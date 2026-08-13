@@ -130,6 +130,8 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="speak")
     def speak(self, request, pk=None):
         """Synthesize examiner question audio (Rumik Mulberry WAV when configured)."""
+        from django.conf import settings as dj_settings
+
         session = self.get_object()
         question_id = request.data.get("question_id")
         text = (request.data.get("text") or "").strip()
@@ -146,13 +148,30 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
             provider = get_tts_provider()
             kwargs = {}
             if isinstance(provider, RumikTTSProvider):
+                config = dict(session.config or {})
+                locked = str(config.get("examiner_speaker") or "").lower().strip()
+
                 if speaker and speaker not in ALLOWED_SPEAKERS:
                     return Response(
                         {"detail": f"speaker must be one of: {', '.join(sorted(ALLOWED_SPEAKERS))}"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-                if speaker:
-                    kwargs["speaker"] = speaker
+
+                # Lock voice for the whole viva: first valid speaker wins; later requests reuse it.
+                if locked in ALLOWED_SPEAKERS:
+                    speaker = locked
+                elif speaker in ALLOWED_SPEAKERS:
+                    config["examiner_speaker"] = speaker
+                    session.config = config
+                    session.save(update_fields=["config", "updated_at"])
+                else:
+                    speaker = str(
+                        getattr(dj_settings, "RUMIK_TTS_DEFAULT_SPEAKER", "siya") or "siya"
+                    ).lower().strip()
+                    if speaker not in ALLOWED_SPEAKERS:
+                        speaker = "siya"
+
+                kwargs["speaker"] = speaker
             audio = provider.synthesize(text, **kwargs)
             content_type = "audio/wav" if isinstance(provider, RumikTTSProvider) else "audio/mpeg"
         except Exception as exc:

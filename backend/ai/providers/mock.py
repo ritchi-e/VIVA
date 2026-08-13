@@ -87,7 +87,7 @@ class MockChatProvider(ChatProvider):
             data = _mock_batch_wording(user_content)
         elif "batch_answer_evaluation" in title:
             data = _mock_batch_evaluation(user_content)
-        elif "viva_next_turn" in title or "next_turn" in title:
+        elif "viva_live_turn" in title or "viva_next_turn" in title or "next_turn" in title:
             data = _mock_next_turn(user_content)
         elif "follow_up" in title:
             data = _mock_follow_up_wording(user_content)
@@ -413,11 +413,17 @@ def _mock_next_turn(user_content: str) -> dict[str, Any]:
     excerpts = _extract_excerpts(user_content)
     blocks = _parse_excerpt_blocks(excerpts)
     snippet = _first_sentence(blocks[0]["content"]) if blocks else "your submission"
-    chunk_id = blocks[0].get("chunk_id", "") if blocks else ""
-    excerpt_quote = (blocks[0].get("content") or snippet)[:120] if blocks else snippet[:80]
 
     if opening:
         return {
+            "answer_quality": "partial",
+            "mode": "advance",
+            "planned_id": planned_id,
+            "acknowledgment": "",
+            "follow_up_question": "",
+            "student_phrase": "",
+            "missing_point": "",
+            # Legacy fields for older schema consumers.
             "answer_analysis": {
                 "quality": "partial",
                 "covered": [],
@@ -425,12 +431,7 @@ def _mock_next_turn(user_content: str) -> dict[str, Any]:
                 "misconception": "",
                 "student_phrase": "",
             },
-            "mode": "advance",
-            "planned_id": planned_id,
-            "acknowledgment": "",
             "question_text": f"What design choice did you make around '{snippet[:80]}'?",
-            "excerpt_quote": excerpt_quote,
-            "excerpt_chunk_id": chunk_id,
             "rationale": "Mock opening question.",
         }
 
@@ -441,6 +442,15 @@ def _mock_next_turn(user_content: str) -> dict[str, Any]:
         quality = "partial"
 
     return {
+        "answer_quality": quality,
+        "mode": mode,
+        "planned_id": planned_id,
+        "acknowledgment": "You mentioned the approach" if not shallow else "",
+        "follow_up_question": (
+            f"Can you go deeper using the detail around '{snippet[:80]}'?" if shallow else ""
+        ),
+        "student_phrase": "mentioned the approach",
+        "missing_point": "specific evidence" if shallow else "",
         "answer_analysis": {
             "quality": quality,
             "covered": ["approach"] if not shallow else [],
@@ -448,16 +458,11 @@ def _mock_next_turn(user_content: str) -> dict[str, Any]:
             "misconception": "",
             "student_phrase": "mentioned the approach",
         },
-        "mode": mode,
-        "planned_id": planned_id,
-        "acknowledgment": "You mentioned the approach" if not shallow else "",
         "question_text": (
             f"Can you go deeper using the detail around '{snippet[:80]}'?"
             if shallow
             else f"What design choice did you make around '{snippet[:80]}'?"
         ),
-        "excerpt_quote": excerpt_quote,
-        "excerpt_chunk_id": chunk_id,
         "rationale": "Mock follow-up after shallow answer." if shallow else "Mock conversational advance.",
     }
 

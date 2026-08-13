@@ -4,9 +4,11 @@ from viva.conversation import (
     _follow_up_cap,
     _follow_up_cap_reached,
     _is_duplicate,
+    _normalize_live_payload,
     _strip_excerpt_labels,
     _verify_quote,
 )
+from viva.models import VivaSession
 
 
 class ConversationHelperTests(TestCase):
@@ -56,3 +58,18 @@ class ConversationHelperTests(TestCase):
 
         session.coverage_state = {"consecutive_follow_ups": 1, "follow_up_total": 1}
         self.assertFalse(_follow_up_cap_reached(session))
+
+    def test_normalize_live_payload_maps_slim_schema(self):
+        data = _normalize_live_payload(
+            {
+                "answer_quality": "weak",
+                "mode": "follow_up",
+                "follow_up_question": "Can you cite your rotation case?",
+                "student_phrase": "balance factor",
+                "missing_point": "LR case",
+            }
+        )
+        self.assertEqual(data["answer_analysis"]["quality"], "weak")
+        self.assertEqual(data["mode"], "follow_up")
+        self.assertEqual(data["question_text"], "Can you cite your rotation case?")
+        self.assertIn("LR case", data["answer_analysis"]["missing"])

@@ -44,7 +44,24 @@ NEXT_TURN_SCHEMA = {
     "required": ["answer_analysis", "mode", "question_text"],
 }
 
+# Narrow live schema (B+C): classify + route; advance wording comes from the plan cache.
+LIVE_TURN_SCHEMA = {
+    "title": "viva_live_turn",
+    "type": "object",
+    "properties": {
+        "answer_quality": {"type": "string"},
+        "mode": {"type": "string"},
+        "planned_id": {"type": "string"},
+        "acknowledgment": {"type": "string"},
+        "follow_up_question": {"type": "string"},
+        "student_phrase": {"type": "string"},
+        "missing_point": {"type": "string"},
+    },
+    "required": ["answer_quality", "mode"],
+}
+
 _QUALITY_FOLLOW_UP = frozenset({"weak", "non_answer", "partial"})
+_VALID_QUALITIES = frozenset({"strong", "partial", "weak", "non_answer"})
 
 
 def _dialogue_blocks(session: VivaSession, *, limit: int = 8) -> list[str]:
@@ -184,7 +201,8 @@ def _compose_spoken(acknowledgment: str, question_text: str) -> str:
 
 
 _CLICHE_OPENERS = re.compile(
-    r"^(?:nice|good|great|excellent|well\s+done|thanks|thank\s+you|i\s+see|i\s+notice)"
+    r"^(?:nice|good|great|excellent|well\s+done|thanks|thank\s+you|i\s+see|i\s+notice|"
+    r"proceeding(?:\s+to\s+(?:the\s+)?next(?:\s+topic)?)?|moving\s+on|let(?:'s| us)\s+move\s+on)"
     r"(?:\s+(?:start|focus|point|job|work|answer|effort|try))?\b[\s,—:-]*",
     re.IGNORECASE,
 )
@@ -363,6 +381,101 @@ def _follow_up_cap_reached(session: VivaSession) -> bool:
     return follow_up_total >= _follow_up_cap(session)
 
 
+def _chunks_from_planned(planned: PlannedQuestion | None) -> list[dict[str, Any]]:
+    if not planned:
+        return []
+    raw = (planned.metadata or {}).get("rag_chunks") or []
+    return [chunk for chunk in raw if isinstance(chunk, dict) and chunk.get("content")]
+
+
+def _chunks_from_question(question: VivaQuestion | None) -> list[dict[str, Any]]:
+    if not question:
+        return []
+    provenance = question.provenance or {}
+    raw = provenance.get("rag_chunks") or []
+    chunks = [chunk for chunk in raw if isinstance(chunk, dict) and chunk.get("content")]
+    if chunks:
+        return chunks
+    return _chunks_from_planned(question.planned_question)
+
+
+def _resolve_rag_chunks(
+    *,
+    focus: PlannedQuestion | None,
+    last_question: VivaQuestion | None,
+    unused: list[PlannedQuestion],
+    session: VivaSession,
+    organization: Organization,
+    last_answer: str,
+    allow_live_retrieve: bool,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Prefer planned/provenance caches; live retrieve only as an escape hatch."""
+    for chunks in (
+        _chunks_from_planned(focus),
+        _chunks_from_question(last_question),
+        *(_chunks_from_planned(item) for item in unused[:3]),
+    ):
+        if chunks:
+            return chunks[:4], False
+
+    if not allow_live_retrieve:
+        return [], False
+
+    query = ""
+    if focus:
+        source_quote = (focus.metadata or {}).get("source_quote") or ""
+        query = build_concept_query(focus.concept, focus.purpose, focus.question_type, source_quote)
+    if not query:
+        query = (last_answer[:300] if last_answer else "") or session.assignment.title
+    retrieved = retrieve_for_submission(session.submission, organization, query, top_k=3)
+    return retrieved[:4], True
+
+
+def _live_model_name() -> str | None:
+    return getattr(settings, "OPENAI_VIVA_MODEL", None) or getattr(settings, "OPENAI_CHAT_MODEL", None)
+
+
+def _normalize_live_payload(data: dict[str, Any]) -> dict[str, Any]:
+    """Accept both LIVE_TURN_SCHEMA and legacy NEXT_TURN_SCHEMA shapes."""
+    if not isinstance(data, dict):
+        return {}
+
+    analysis = data.get("answer_analysis") if isinstance(data.get("answer_analysis"), dict) else {}
+    quality = str(
+        data.get("answer_quality") or analysis.get("quality") or ""
+    ).lower().strip()
+    if quality not in _VALID_QUALITIES:
+        quality = "partial"
+
+    mode = str(data.get("mode") or "").lower().strip()
+    if mode not in ("follow_up", "advance", "complete"):
+        mode = _mode_from_analysis({"quality": quality})
+
+    question_text = (data.get("question_text") or data.get("follow_up_question") or "").strip()
+    acknowledgment = (data.get("acknowledgment") or data.get("bridge") or "").strip()
+    missing = data.get("missing_point") or ""
+    missing_list = analysis.get("missing") if isinstance(analysis.get("missing"), list) else []
+    if missing and missing not in missing_list:
+        missing_list = [*missing_list, str(missing)]
+
+    return {
+        "answer_analysis": {
+            "quality": quality,
+            "covered": analysis.get("covered") if isinstance(analysis.get("covered"), list) else [],
+            "missing": missing_list,
+            "misconception": analysis.get("misconception") or "",
+            "student_phrase": data.get("student_phrase") or analysis.get("student_phrase") or "",
+        },
+        "mode": mode,
+        "planned_id": str(data.get("planned_id") or ""),
+        "acknowledgment": acknowledgment,
+        "question_text": question_text,
+        "excerpt_quote": (data.get("excerpt_quote") or "").strip(),
+        "excerpt_chunk_id": (data.get("excerpt_chunk_id") or "").strip(),
+        "rationale": data.get("rationale") or "",
+    }
+
+
 def generate_next_turn(
     session: VivaSession,
     organization: Organization,
@@ -372,17 +485,16 @@ def generate_next_turn(
     """
     Decide the examiner's next spoken turn from dialogue history + remaining coverage plan.
 
-    Returns dict with mode, planned_id, question_text, acknowledgment, rationale, rag_chunks,
-    excerpt, answer_analysis, and parent_planned.
+    Live path is intentionally narrow: classify answer quality, choose follow_up/advance,
+    and prefer cached planned excerpts over live retrieval.
     """
     coverage = _coverage_state(session)
     covered_concepts = set(coverage.get("covered_concepts") or [])
-    follow_up_cap = _follow_up_cap(session)
 
     unused = _unused_planned(plan, session, covered_concepts=covered_concepts)
     asked = _asked_questions(session)
     prior_texts = [item["text"] for item in asked]
-    dialogue = _dialogue_blocks(session, limit=4)
+    dialogue = _dialogue_blocks(session, limit=3)
 
     last_answer = ""
     last_answer_id: str | None = None
@@ -403,49 +515,82 @@ def generate_next_turn(
     if last_question and last_question.planned_question_id and not must_advance:
         focus = last_question.planned_question or focus
 
-    source_quote = ""
-    rag_chunks: list[dict] = []
-    if focus:
-        source_quote = (focus.metadata or {}).get("source_quote") or ""
-        rag_chunks = list((focus.metadata or {}).get("rag_chunks") or [])
-        if not rag_chunks:
-            rag_chunks = retrieve_for_submission(
-                session.submission,
-                organization,
-                build_concept_query(focus.concept, focus.purpose, focus.question_type, source_quote),
-                top_k=3,
-            )
-    if not rag_chunks:
-        rag_chunks = retrieve_for_submission(
-            session.submission,
-            organization,
-            last_answer[:300] or session.assignment.title,
-            top_k=4,
-        )
+    source_quote = (focus.metadata or {}).get("source_quote") or "" if focus else ""
 
-    excerpts = format_chunks_for_conversation(rag_chunks, max_chars=4500)
+    # Opening turn: no live LLM — speak from the cached plan.
+    if not dialogue:
+        rag_chunks, _ = _resolve_rag_chunks(
+            focus=focus,
+            last_question=last_question,
+            unused=unused,
+            session=session,
+            organization=organization,
+            last_answer=last_answer,
+            allow_live_retrieve=False,
+        )
+        fallback = _fallback_question(focus, "", chunks=rag_chunks)
+        excerpt = _build_excerpt(
+            fallback.get("excerpt_quote") or "",
+            fallback.get("excerpt_chunk_id") or "",
+            rag_chunks,
+            fallback_quote=source_quote,
+        )
+        acknowledgment, question_text = _polish_turn("", fallback["question_text"], max_questions=1)
+        return {
+            "mode": "advance",
+            "planned_id": str(focus.id) if focus else "",
+            "planned": focus,
+            "question_text": _compose_spoken(acknowledgment, question_text),
+            "raw_question": question_text,
+            "acknowledgment": acknowledgment,
+            "bridge": acknowledgment,
+            "rationale": "Opening question from cached plan.",
+            "rag_chunks": rag_chunks,
+            "excerpt": excerpt,
+            "answer_analysis": fallback.get("answer_analysis") or {},
+            "triggering_answer_id": None,
+            "parent_planned": None,
+            "used_live_retrieve": False,
+        }
+
     remaining = [
         {
             "planned_id": str(item.id),
-            "type": item.question_type,
             "concept": item.concept,
             "purpose": item.purpose,
-            "source_quote": (item.metadata or {}).get("source_quote") or "",
+            "source_quote": ((item.metadata or {}).get("source_quote") or "")[:160],
         }
-        for item in unused[:5]
+        for item in unused[:4]
     ]
-
     already_asked_block = "\n".join(
-        f"- Q{item['sequence']}: [{item['concept']}] {item['text']}" for item in asked
+        f"- Q{item['sequence']}: [{item['concept']}] {item['text']}" for item in asked[-4:]
     ) or "(none yet)"
 
+    # Prefer cached chunks for the prompt; only retrieve live for follow-up grounding if needed later.
+    rag_chunks, used_live_retrieve = _resolve_rag_chunks(
+        focus=focus,
+        last_question=last_question,
+        unused=unused,
+        session=session,
+        organization=organization,
+        last_answer=last_answer,
+        allow_live_retrieve=False,
+    )
+    # Compact grounding: quote + a couple chunks, not a full re-RAG of the submission.
+    grounding_bits: list[str] = []
+    if source_quote:
+        grounding_bits.append(f"Focus quote: {source_quote[:220]}")
+    if rag_chunks:
+        grounding_bits.append(format_chunks_for_conversation(rag_chunks[:2], max_chars=1800))
+    grounding = "\n".join(grounding_bits) if grounding_bits else "No cached excerpts; stay on planned topics."
+
     shallow_note = (
-        "Heuristic: the last answer looks thin or vague — lean toward follow_up unless coverage is solid."
+        "Heuristic: last answer looks thin — lean follow_up unless must advance."
         if shallow_hint
         else ""
     )
     advance_note = (
-        "Server constraint: too many follow-ups already — mode must be advance."
+        "Constraint: follow-up cap reached — mode must be advance."
         if must_advance
         else ""
     )
@@ -457,58 +602,46 @@ def generate_next_turn(
                 {
                     "role": "system",
                     "content": (
-                        "You are a live oral examiner in a viva voce. "
-                        "Speak naturally but professionally — like a real examiner, not a chatbot.\n"
-                        "Workflow:\n"
-                        "1. If there is a student answer, fill answer_analysis first (what they covered, "
-                        "missed, misconceptions, a short student_phrase they used).\n"
-                        "2. Choose mode from answer_analysis.quality: weak/non_answer/partial -> follow_up; "
-                        "strong -> advance.\n"
-                        "3. Frame question_text from missing points or the next planned topic.\n"
-                        "Rules:\n"
-                        "- question_text: ONE spoken question (max TWO if tightly related). Under 35 words.\n"
-                        "- Never reference excerpts by number (no 'Excerpt 2'). Quote the actual snippet.\n"
-                        "- excerpt_quote: short verbatim snippet from Submission excerpts when grounding the question.\n"
-                        "- acknowledgment: optional, max 12 words, paraphrase something the student said; "
-                        "no Nice/Good/Great/Thanks clichés. Empty for opening question.\n"
-                        "- Do not repeat any question listed under Already asked.\n"
-                        "Return JSON instance only — never echo the schema."
+                        "You are a live oral viva router, not a long-form question writer.\n"
+                        "Return JSON only.\n"
+                        "1) Set answer_quality: strong | partial | weak | non_answer.\n"
+                        "2) Set mode: follow_up (weak/non_answer/partial) or advance (strong).\n"
+                        "3) If mode=advance, set planned_id from Remaining coverage topics.\n"
+                        "4) If mode=follow_up, write follow_up_question: ONE short question under 25 words "
+                        "about what the student missed; do not invent new topics outside the submission.\n"
+                        "5) acknowledgment optional, max 10 words, no Nice/Good/Great/Thanks.\n"
+                        "Do not repeat Already asked questions."
                     ),
                 },
                 {
                     "role": "user",
                     "content": (
                         f"Assignment: {session.assignment.title}\n"
-                        f"Questions asked so far: {session.questions_asked}/"
-                        f"{session.question_budget}\n\n"
-                        f"## Dialogue so far\n"
-                        + ("\n\n".join(dialogue) if dialogue else "(This is the opening question.)")
+                        f"Progress: {session.questions_asked}/{session.question_budget}\n\n"
+                        f"## Recent dialogue\n"
+                        + ("\n\n".join(dialogue) if dialogue else "(none)")
                         + "\n\n"
-                        f"## Already asked (do not repeat)\n{already_asked_block}\n\n"
-                        f"## Remaining coverage topics (use planned_id when advancing)\n{remaining}\n\n"
-                        f"## Submission excerpts\n{excerpts}\n\n"
-                        + (f"Note: {shallow_note}\n" if shallow_note else "")
-                        + (f"Constraint: {advance_note}\n" if advance_note else "")
-                        + "\nReturn answer_analysis, mode, planned_id, acknowledgment, question_text, "
-                        "excerpt_quote, excerpt_chunk_id, rationale."
+                        f"## Already asked\n{already_asked_block}\n\n"
+                        f"## Remaining coverage topics\n{remaining}\n\n"
+                        f"## Cached grounding\n{grounding}\n"
+                        + (f"\nNote: {shallow_note}\n" if shallow_note else "")
+                        + (f"\nConstraint: {advance_note}\n" if advance_note else "")
                     ),
                 },
             ],
-            NEXT_TURN_SCHEMA,
-            model=getattr(settings, "OPENAI_VIVA_MODEL", None) or getattr(settings, "OPENAI_CHAT_MODEL", None),
+            LIVE_TURN_SCHEMA,
+            model=_live_model_name(),
         )
-        data = result.data if isinstance(result.data, dict) else {}
+        data = _normalize_live_payload(result.data if isinstance(result.data, dict) else {})
     except Exception:
-        logger.exception("Conversational next-turn generation failed; using fallback")
-        data = _fallback_question(focus, last_answer, chunks=rag_chunks)
+        logger.exception("Live turn routing failed; using fallback")
+        data = _normalize_live_payload(_fallback_question(focus, last_answer, chunks=rag_chunks))
 
-    answer_analysis = data.get("answer_analysis") if isinstance(data.get("answer_analysis"), dict) else {}
+    answer_analysis = data.get("answer_analysis") or {}
     mode = str(data.get("mode") or _mode_from_analysis(answer_analysis)).lower()
     if mode not in ("follow_up", "advance", "complete"):
         mode = _mode_from_analysis(answer_analysis)
     if must_advance and mode == "follow_up":
-        mode = "advance"
-    if not dialogue:
         mode = "advance"
     if mode == "advance" and not unused and session.questions_asked > 0:
         return {
@@ -519,6 +652,7 @@ def generate_next_turn(
             "rag_chunks": rag_chunks,
             "answer_analysis": answer_analysis,
             "triggering_answer_id": last_answer_id,
+            "used_live_retrieve": used_live_retrieve,
         }
 
     planned_id = str(data.get("planned_id") or "")
@@ -533,22 +667,59 @@ def generate_next_turn(
         planned = last_question.planned_question
         planned_id = str(planned.id) if planned else planned_id
 
-    question_text = (data.get("question_text") or "").strip()
-    acknowledgment = (data.get("acknowledgment") or data.get("bridge") or "").strip()
+    # Refresh chunk cache for the chosen planned item when advancing.
+    if planned:
+        planned_chunks = _chunks_from_planned(planned)
+        if planned_chunks:
+            rag_chunks = planned_chunks[:4]
+            used_live_retrieve = False
+
+    acknowledgment = (data.get("acknowledgment") or "").strip()
     excerpt_quote = (data.get("excerpt_quote") or "").strip()
     excerpt_chunk_id = (data.get("excerpt_chunk_id") or "").strip()
 
-    if not question_text:
-        fallback = _fallback_question(planned or focus, last_answer, chunks=rag_chunks)
-        question_text = fallback["question_text"]
-        acknowledgment = acknowledgment or fallback.get("acknowledgment") or ""
-        excerpt_quote = excerpt_quote or fallback.get("excerpt_quote") or ""
-        excerpt_chunk_id = excerpt_chunk_id or fallback.get("excerpt_chunk_id") or ""
-        planned_id = planned_id or fallback.get("planned_id") or ""
-        if not answer_analysis:
-            answer_analysis = fallback.get("answer_analysis") or {}
-        if planned_id and planned is None:
-            planned = next((item for item in unused if str(item.id) == planned_id), planned)
+    if mode == "follow_up":
+        question_text = (data.get("question_text") or "").strip()
+        if not question_text:
+            # Escape hatch: retrieve once only when follow-up needs grounding and cache is empty.
+            if not rag_chunks:
+                rag_chunks, used_live_retrieve = _resolve_rag_chunks(
+                    focus=planned or focus,
+                    last_question=last_question,
+                    unused=unused,
+                    session=session,
+                    organization=organization,
+                    last_answer=last_answer,
+                    allow_live_retrieve=True,
+                )
+            fallback = _fallback_question(planned or focus, last_answer, chunks=rag_chunks)
+            question_text = (
+                f"Can you go deeper on {planned.concept if planned else 'that point'} "
+                f"with a concrete detail from your submission?"
+            )
+            if last_answer and len(last_answer.split()) < 18:
+                question_text = (
+                    "Your answer was brief — give a concrete example from your submission "
+                    f"about {planned.concept if planned else 'this topic'}."
+                )
+            excerpt_quote = excerpt_quote or fallback.get("excerpt_quote") or ""
+            excerpt_chunk_id = excerpt_chunk_id or fallback.get("excerpt_chunk_id") or ""
+    else:
+        # Advance: use planned wording / deterministic fallback (no live long-form generation).
+        acknowledgment = _sanitize_acknowledgment(acknowledgment)
+        if planned and (planned.wording or "").strip():
+            question_text = planned.wording.strip()
+        else:
+            fallback = _fallback_question(planned or focus, last_answer, chunks=rag_chunks)
+            question_text = fallback["question_text"]
+            excerpt_quote = excerpt_quote or fallback.get("excerpt_quote") or ""
+            excerpt_chunk_id = excerpt_chunk_id or fallback.get("excerpt_chunk_id") or ""
+            planned_id = planned_id or fallback.get("planned_id") or ""
+            if planned_id and planned is None:
+                planned = next((item for item in unused if str(item.id) == planned_id), planned)
+        # Keep acks short only when they add content; drop filler transitions.
+        if acknowledgment and re.search(r"\b(next topic|moving on|proceed)\b", acknowledgment, re.I):
+            acknowledgment = ""
 
     fallback_quote = (planned.metadata or {}).get("source_quote") if planned else source_quote
     excerpt = _build_excerpt(
@@ -558,7 +729,7 @@ def generate_next_turn(
         fallback_quote=fallback_quote or "",
     )
 
-    max_q = 2 if mode == "follow_up" else 1
+    max_q = 1
     acknowledgment, question_text = _polish_turn(acknowledgment, question_text, max_questions=max_q)
 
     if _is_duplicate(question_text, prior_texts):
@@ -567,6 +738,7 @@ def generate_next_turn(
             mode = "advance"
             planned = unused[0]
             planned_id = str(planned.id)
+            rag_chunks = _chunks_from_planned(planned)[:4] or rag_chunks
             fallback = _fallback_question(planned, last_answer, chunks=rag_chunks)
             question_text = fallback["question_text"]
             acknowledgment = ""
@@ -579,11 +751,13 @@ def generate_next_turn(
             acknowledgment, question_text = _polish_turn(acknowledgment, question_text, max_questions=1)
         elif unused:
             for alt in unused:
-                alt_fallback = _fallback_question(alt, last_answer, chunks=rag_chunks)
+                alt_chunks = _chunks_from_planned(alt)[:4] or rag_chunks
+                alt_fallback = _fallback_question(alt, last_answer, chunks=alt_chunks)
                 alt_text = alt_fallback["question_text"]
                 if not _is_duplicate(alt_text, prior_texts):
                     planned = alt
                     planned_id = str(alt.id)
+                    rag_chunks = alt_chunks
                     question_text = alt_text
                     acknowledgment = ""
                     excerpt = _build_excerpt(
@@ -612,4 +786,5 @@ def generate_next_turn(
         "parent_planned": (
             last_question.planned_question if mode == "follow_up" and last_question else None
         ),
+        "used_live_retrieve": used_live_retrieve,
     }

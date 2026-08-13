@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type MouseEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, getOrganizationId, getStoredTokens, getVivaWebSocketUrl, vivaApi } from '@/lib/api'
 import axios from 'axios'
@@ -73,6 +73,7 @@ export function VivaInterface({
   const [finishing, setFinishing] = useState(false)
   const [selectedVoice, setSelectedVoice] = useState<ExaminerVoiceChoice>('siya')
   const [previewingVoice, setPreviewingVoice] = useState<ExaminerVoiceChoice | null>(null)
+  const selectedVoiceRef = useRef<ExaminerVoiceChoice>('siya')
 
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -298,14 +299,18 @@ export function VivaInterface({
       }
 
       try {
-        await speakExaminer(q.text, { sessionId, speaker: selectedVoice })
+        const speaker = selectedVoiceRef.current
+        await speakExaminer(q.text, { sessionId, speaker })
         if (completeRef.current) return
         await startListening()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Examiner voice failed')
+        setPhase('error')
       } finally {
         if (flow.id === q.id) flow.inFlight = false
       }
     },
-    [selectedVoice, sessionId, startListening, stopListening, ttsSupported],
+    [sessionId, startListening, stopListening, ttsSupported],
   )
 
   const queueQuestion = useCallback(
@@ -325,7 +330,8 @@ export function VivaInterface({
     }
 
     setError(null)
-    setExaminerVoiceChoice(selectedVoice)
+    selectedVoiceRef.current = selectedVoice
+    setExaminerVoiceChoice(selectedVoice, sessionId)
     void enterFullscreen(containerRef.current ?? document.documentElement)
     try {
       await primeSpeechSynthesis()
@@ -341,7 +347,7 @@ export function VivaInterface({
     } else if (phaseRef.current === 'connecting' || phaseRef.current === 'preparing') {
       setPhase(connected ? 'preparing' : 'connecting')
     }
-  }, [connected, handleNewQuestion, selectedVoice])
+  }, [connected, handleNewQuestion, selectedVoice, sessionId])
 
   const finishViva = useCallback(async () => {
     if (completeRef.current || finishing) return
@@ -540,10 +546,17 @@ export function VivaInterface({
       stopListening()
       stopAudio()
       stopExaminerSpeech()
-      resetExaminerVoice()
+      // Do not resetExaminerVoice() here — this effect also re-runs on reconnect
+      // dependency churn and would drop the locked Noah/Siya mid-viva.
       void exitFullscreen()
     }
   }, [sessionId, connect, queueQuestion, stopListening, stopAudio, initialComplete])
+
+  useEffect(() => {
+    return () => {
+      resetExaminerVoice(sessionId)
+    }
+  }, [sessionId])
 
   const progress =
     questionsAsked != null && questionBudget > 0
@@ -554,10 +567,21 @@ export function VivaInterface({
 
   const showBeginButton = !initialComplete && !audioStarted && phase !== 'complete'
   const immersive = !initialComplete
+  const blockCopy = immersive && phase !== 'complete'
+
+  const preventCopy = useCallback((event: ClipboardEvent | MouseEvent | DragEvent) => {
+    if (!blockCopy) return
+    event.preventDefault()
+    event.stopPropagation()
+  }, [blockCopy])
 
   return (
     <div
       ref={containerRef}
+      onCopy={preventCopy}
+      onCut={preventCopy}
+      onContextMenu={preventCopy}
+      onDragStart={preventCopy}
       className={cn(
         'relative overflow-hidden bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-900 text-white',
         immersive
@@ -619,7 +643,10 @@ export function VivaInterface({
                     <button
                       key={option.id}
                       type="button"
-                      onClick={() => setSelectedVoice(option.id)}
+                      onClick={() => {
+                        setSelectedVoice(option.id)
+                        selectedVoiceRef.current = option.id
+                      }}
                       className={cn(
                         'rounded-xl border px-3 py-3 text-left transition',
                         active
@@ -662,11 +689,24 @@ export function VivaInterface({
         ) : null}
 
         {excerpt?.quote && phase !== 'complete' ? (
-          <div className="mt-8 w-full max-w-xl rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+          <div
+            className="mt-8 w-full max-w-xl select-none rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm"
+            onCopy={preventCopy}
+            onCut={preventCopy}
+            onContextMenu={preventCopy}
+            onDragStart={preventCopy}
+          >
             <p className="text-xs font-medium uppercase tracking-wider text-white/45">
               From your submission{excerpt.source_ref ? ` · ${excerpt.source_ref}` : ''}
             </p>
-            <pre className="mt-3 max-h-40 overflow-y-auto whitespace-pre-wrap font-mono text-sm leading-relaxed text-white/85">
+            <pre
+              className="mt-3 max-h-40 overflow-y-auto whitespace-pre-wrap font-mono text-sm leading-relaxed text-white/85 select-none"
+              style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
+              onCopy={preventCopy}
+              onCut={preventCopy}
+              onContextMenu={preventCopy}
+              onDragStart={preventCopy}
+            >
               {excerpt.quote}
             </pre>
           </div>

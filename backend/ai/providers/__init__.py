@@ -3,6 +3,7 @@ from django.conf import settings
 from ai.providers.base import ChatProvider, EmbeddingProvider, STTProvider, TTSProvider
 from ai.providers.mock import MockChatProvider, MockEmbeddingProvider, MockSTTProvider, MockTTSProvider
 
+
 def get_chat_provider() -> ChatProvider:
     provider = (settings.AI_PROVIDER or "mock").lower().strip()
     if provider == "openai":
@@ -42,11 +43,25 @@ def get_stt_provider() -> STTProvider:
 
 
 def get_tts_provider() -> TTSProvider:
-    provider = (settings.AI_PROVIDER or "mock").lower().strip()
-    if provider == "openai":
+    """Prefer Rumik Mulberry when RUMIK_API_KEY is set (or TTS_PROVIDER=rumik)."""
+    explicit = (getattr(settings, "TTS_PROVIDER", "") or "").lower().strip()
+    rumik_key = (getattr(settings, "RUMIK_API_KEY", "") or "").strip()
+
+    use_rumik = explicit == "rumik" or (explicit in ("", "auto") and bool(rumik_key))
+    if use_rumik:
+        if not rumik_key:
+            raise RuntimeError("TTS_PROVIDER=rumik but RUMIK_API_KEY is not set")
+        from ai.providers.rumik_provider import RumikTTSProvider
+
+        return RumikTTSProvider()
+
+    if explicit == "openai" or (
+        explicit in ("", "auto") and (settings.AI_PROVIDER or "").lower().strip() == "openai"
+    ):
         if not settings.OPENAI_API_KEY:
-            raise RuntimeError("AI_PROVIDER=openai but OPENAI_API_KEY is not set")
+            raise RuntimeError("OpenAI TTS requested but OPENAI_API_KEY is not set")
         from ai.providers.openai_provider import OpenAITTSProvider
 
         return OpenAITTSProvider()
+
     return MockTTSProvider()

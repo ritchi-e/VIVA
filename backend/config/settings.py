@@ -203,6 +203,19 @@ GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-1.5-flash")
 GEMINI_EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "text-embedding-004")
 EMBEDDING_DIMENSIONS = 1536
 
+# Rumik silk TTS (Mulberry) — preferred for examiner voice when key is set.
+# Accept common env spellings so local .env typos still work.
+RUMIK_API_KEY = (
+    os.getenv("RUMIK_API_KEY", "")
+    or os.getenv("rumik_API_KEY", "")
+    or os.getenv("RUMIK_TTS_API_KEY", "")
+).strip()
+RUMIK_TTS_MODEL = os.getenv("RUMIK_TTS_MODEL", "mulberry")
+RUMIK_TTS_DEFAULT_SPEAKER = os.getenv("RUMIK_TTS_DEFAULT_SPEAKER", "siya")
+RUMIK_TTS_TIMEOUT = float(os.getenv("RUMIK_TTS_TIMEOUT", "45") or 45)
+TTS_PROVIDER = os.getenv("TTS_PROVIDER", "").strip().lower()  # rumik | openai | mock | auto
+
+
 GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
 GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
 

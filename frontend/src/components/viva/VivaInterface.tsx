@@ -3,17 +3,15 @@ import { Link } from 'react-router-dom'
 import { api, getOrganizationId, getStoredTokens, getVivaWebSocketUrl, vivaApi } from '@/lib/api'
 import axios from 'axios'
 import {
-  getExaminerVoiceOptions,
+  EXAMINER_VOICE_OPTIONS,
   previewExaminerVoice,
   primeSpeechSynthesis,
   resetExaminerVoice,
   setExaminerVoiceChoice,
   speakExaminer,
-  speechSynthesisSupported,
   stopExaminerSpeech,
   waitUntilSpeechIdle,
   type ExaminerVoiceChoice,
-  type ExaminerVoiceOption,
 } from '@/lib/browserTts'
 import { enterFullscreen, exitFullscreen } from '@/lib/fullscreen'
 import type { VivaExcerpt, VivaWsMessage } from '@/types'
@@ -73,8 +71,7 @@ export function VivaInterface({
   const [connected, setConnected] = useState(false)
   const [audioStarted, setAudioStarted] = useState(initialComplete)
   const [finishing, setFinishing] = useState(false)
-  const [voiceOptions, setVoiceOptions] = useState<ExaminerVoiceOption[]>([])
-  const [selectedVoice, setSelectedVoice] = useState<ExaminerVoiceChoice | null>(null)
+  const [selectedVoice, setSelectedVoice] = useState<ExaminerVoiceChoice>('siya')
   const [previewingVoice, setPreviewingVoice] = useState<ExaminerVoiceChoice | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -118,7 +115,7 @@ export function VivaInterface({
     [],
   )
 
-  const ttsSupported = useMemo(() => speechSynthesisSupported(), [])
+  const ttsSupported = true
 
   const stopAudio = useCallback(() => {
     stopExaminerSpeech()
@@ -295,20 +292,20 @@ export function VivaInterface({
 
       if (!ttsSupported) {
         flow.inFlight = false
-        setError('Text-to-speech is not available in this browser.')
+        setError('Text-to-speech is not available.')
         setPhase('error')
         return
       }
 
       try {
-        await speakExaminer(q.text)
+        await speakExaminer(q.text, { sessionId, speaker: selectedVoice })
         if (completeRef.current) return
         await startListening()
       } finally {
         if (flow.id === q.id) flow.inFlight = false
       }
     },
-    [startListening, stopListening, ttsSupported],
+    [selectedVoice, sessionId, startListening, stopListening, ttsSupported],
   )
 
   const queueQuestion = useCallback(
@@ -326,14 +323,9 @@ export function VivaInterface({
       setError('Choose an examiner voice before starting.')
       return
     }
-    const option = voiceOptions.find((v) => v.id === selectedVoice)
-    if (!option?.voiceURI) {
-      setError('Selected voice is not available in this browser.')
-      return
-    }
 
     setError(null)
-    setExaminerVoiceChoice(selectedVoice, option.voiceURI)
+    setExaminerVoiceChoice(selectedVoice)
     void enterFullscreen(containerRef.current ?? document.documentElement)
     try {
       await primeSpeechSynthesis()
@@ -349,7 +341,7 @@ export function VivaInterface({
     } else if (phaseRef.current === 'connecting' || phaseRef.current === 'preparing') {
       setPhase(connected ? 'preparing' : 'connecting')
     }
-  }, [connected, handleNewQuestion, selectedVoice, voiceOptions])
+  }, [connected, handleNewQuestion, selectedVoice])
 
   const finishViva = useCallback(async () => {
     if (completeRef.current || finishing) return
@@ -517,14 +509,6 @@ export function VivaInterface({
   ])
 
   useEffect(() => {
-    if (!ttsSupported || initialComplete) return
-    void getExaminerVoiceOptions().then((options) => {
-      setVoiceOptions(options)
-      setSelectedVoice((prev) => prev ?? options[0]?.id ?? null)
-    })
-  }, [initialComplete, ttsSupported])
-
-  useEffect(() => {
     if (initialComplete) return undefined
     shouldReconnect.current = true
     connect()
@@ -628,53 +612,45 @@ export function VivaInterface({
           <div className="mt-8 flex w-full max-w-lg flex-col items-stretch gap-4">
             <div>
               <p className="mb-3 text-center text-sm text-white/60">Choose examiner voice</p>
-              <div className="grid gap-2 sm:grid-cols-3">
-                {voiceOptions.map((option) => {
+              <div className="grid gap-2 sm:grid-cols-2">
+                {EXAMINER_VOICE_OPTIONS.map((option) => {
                   const active = selectedVoice === option.id
                   return (
                     <button
                       key={option.id}
                       type="button"
-                      disabled={!option.voiceURI}
                       onClick={() => setSelectedVoice(option.id)}
                       className={cn(
                         'rounded-xl border px-3 py-3 text-left transition',
                         active
                           ? 'border-cyan-400/60 bg-cyan-500/15'
                           : 'border-white/10 bg-white/5 hover:bg-white/10',
-                        !option.voiceURI && 'opacity-40',
                       )}
                     >
                       <p className="text-sm font-medium text-white">{option.label}</p>
                       <p className="mt-0.5 text-xs text-white/50">{option.description}</p>
-                      {option.voiceName ? (
-                        <p className="mt-1 truncate text-[10px] text-white/35">{option.voiceName}</p>
-                      ) : null}
                     </button>
                   )
                 })}
               </div>
-              {selectedVoice ? (
-                <button
-                  type="button"
-                  disabled={previewingVoice != null}
-                  onClick={() => {
-                    const option = voiceOptions.find((v) => v.id === selectedVoice)
-                    if (!option?.voiceURI) return
-                    setPreviewingVoice(selectedVoice)
-                    void previewExaminerVoice(option.voiceURI).finally(() => setPreviewingVoice(null))
-                  }}
-                  className="mt-3 w-full rounded-full border border-white/15 bg-white/5 py-2 text-xs font-medium text-white/70 hover:bg-white/10 disabled:opacity-50"
-                >
-                  {previewingVoice === selectedVoice ? 'Playing preview…' : 'Preview voice'}
-                </button>
-              ) : null}
+              <button
+                type="button"
+                disabled={previewingVoice != null}
+                onClick={() => {
+                  setPreviewingVoice(selectedVoice)
+                  void previewExaminerVoice(sessionId, selectedVoice).finally(() =>
+                    setPreviewingVoice(null),
+                  )
+                }}
+                className="mt-3 w-full rounded-full border border-white/15 bg-white/5 py-2 text-xs font-medium text-white/70 hover:bg-white/10 disabled:opacity-50"
+              >
+                {previewingVoice === selectedVoice ? 'Playing preview…' : 'Preview voice'}
+              </button>
             </div>
             <button
               type="button"
-              disabled={!selectedVoice}
               onClick={() => void beginSession()}
-              className="rounded-full bg-gradient-to-r from-cyan-500 to-violet-500 px-8 py-3 text-sm font-semibold text-white shadow-lg transition hover:opacity-90 disabled:opacity-40"
+              className="rounded-full bg-gradient-to-r from-cyan-500 to-violet-500 px-8 py-3 text-sm font-semibold text-white shadow-lg transition hover:opacity-90"
             >
               Begin viva
             </button>

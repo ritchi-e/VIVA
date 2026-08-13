@@ -109,7 +109,7 @@ class OpenAITTSProvider(TTSProvider):
         self.model = getattr(settings, "OPENAI_TTS_MODEL", "tts-1")
         self.voice = getattr(settings, "OPENAI_TTS_VOICE", "nova")
 
-    def synthesize(self, text: str) -> bytes:
+    def synthesize(self, text: str, **kwargs) -> bytes:
         response = self.client.audio.speech.create(
             model=self.model,
             voice=self.voice,
@@ -117,4 +117,5 @@ class OpenAITTSProvider(TTSProvider):
             response_format="mp3",
         )
         return response.content
+
 

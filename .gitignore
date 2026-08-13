@@ -73,3 +73,7 @@ docker-compose.override.yml
 *.pem
 *.key
 credentials.json
+
+#docs
+docs/interview-guide.md
+improvements.md

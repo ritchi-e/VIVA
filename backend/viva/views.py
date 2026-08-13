@@ -129,10 +129,11 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="speak")
     def speak(self, request, pk=None):
-        """Synthesize examiner question audio (TTS). Question text is not shown in the UI."""
+        """Synthesize examiner question audio (Rumik Mulberry WAV when configured)."""
         session = self.get_object()
         question_id = request.data.get("question_id")
         text = (request.data.get("text") or "").strip()
+        speaker = (request.data.get("speaker") or request.data.get("voice") or "").strip().lower()
         if question_id:
             question = VivaQuestion.objects.get(pk=question_id, session=session)
             text = question.question_text
@@ -140,11 +141,23 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
             return Response({"detail": "question_id or text is required."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             from ai.providers import get_tts_provider
+            from ai.providers.rumik_provider import ALLOWED_SPEAKERS, RumikTTSProvider
 
-            audio = get_tts_provider().synthesize(text)
+            provider = get_tts_provider()
+            kwargs = {}
+            if isinstance(provider, RumikTTSProvider):
+                if speaker and speaker not in ALLOWED_SPEAKERS:
+                    return Response(
+                        {"detail": f"speaker must be one of: {', '.join(sorted(ALLOWED_SPEAKERS))}"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if speaker:
+                    kwargs["speaker"] = speaker
+            audio = provider.synthesize(text, **kwargs)
+            content_type = "audio/wav" if isinstance(provider, RumikTTSProvider) else "audio/mpeg"
         except Exception as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
-        return HttpResponse(audio, content_type="audio/mpeg")
+        return HttpResponse(audio, content_type=content_type)
 
     @action(detail=True, methods=["post"])
     def finish(self, request, pk=None):

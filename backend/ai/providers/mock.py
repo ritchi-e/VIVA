@@ -136,8 +136,9 @@ class MockSTTProvider(STTProvider):
 
 
 class MockTTSProvider(TTSProvider):
-    def synthesize(self, text: str) -> bytes:
+    def synthesize(self, text: str, **kwargs) -> bytes:
         return f"MOCK_AUDIO:{text}".encode("utf-8")
+
 
 
 def extract_json_block(text: str) -> dict[str, Any]:

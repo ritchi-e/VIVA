@@ -58,5 +58,6 @@ class STTProvider(ABC):
 
 class TTSProvider(ABC):
     @abstractmethod
-    def synthesize(self, text: str) -> bytes:
+    def synthesize(self, text: str, **kwargs: Any) -> bytes:
         raise NotImplementedError
+

@@ -84,6 +84,10 @@ def generate_assessment_for_session(session: VivaSession, organization: Organiza
             "areas_requiring_review": data.get("areas_requiring_review", []),
             "unanswered_areas": data.get("unanswered_areas", []),
             "recommended_followups": data.get("recommended_followups", []),
+            "disclaimer": (
+                "AI-generated assessment of the student's understanding of the submitted implementation. "
+                "This does not verify that the code executes. Instructor review required."
+            )[:255],
         },
     )
     assessment.criteria.all().delete()

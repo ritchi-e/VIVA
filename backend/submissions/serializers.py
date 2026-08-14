@@ -2,12 +2,19 @@ import hashlib
 import logging
 import uuid
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import Max
 from rest_framework import serializers
 
-from submissions.models import Submission, SubmissionFile
+from submissions.models import (
+    RepositoryFile,
+    RepositorySnapshot,
+    Submission,
+    SubmissionFile,
+)
 from submissions.pipeline import _detect_file_type
+from submissions.repository.urls import GithubUrlError, parse_github_url
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +35,56 @@ class SubmissionFileSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class RepositoryFileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RepositoryFile
+        fields = (
+            "id",
+            "path",
+            "language",
+            "category",
+            "size_bytes",
+            "indexed",
+            "skip_reason",
+        )
+        read_only_fields = fields
+
+
+class RepositorySnapshotSerializer(serializers.ModelSerializer):
+    files = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RepositorySnapshot
+        fields = (
+            "id",
+            "github_url",
+            "owner",
+            "repo",
+            "default_branch",
+            "commit_sha",
+            "status",
+            "files_indexed",
+            "files_skipped",
+            "total_bytes",
+            "extracted_chars",
+            "project_profile",
+            "error_message",
+            "files",
+        )
+        read_only_fields = fields
+
+    def get_files(self, obj):
+        indexed = obj.files.filter(indexed=True).order_by("path")[:40]
+        skipped = obj.files.filter(indexed=False).order_by("path")[:20]
+        return {
+            "indexed": RepositoryFileSerializer(indexed, many=True).data,
+            "skipped_sample": RepositoryFileSerializer(skipped, many=True).data,
+        }
+
+
 class SubmissionSerializer(serializers.ModelSerializer):
     files = SubmissionFileSerializer(many=True, read_only=True)
+    repository = RepositorySnapshotSerializer(read_only=True)
     student_email = serializers.EmailField(source="student.email", read_only=True)
     student_name = serializers.CharField(source="student.full_name", read_only=True)
     assignment_title = serializers.CharField(source="assignment.title", read_only=True)
@@ -44,6 +99,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
             "student_email",
             "student_name",
             "status",
+            "processing_stage",
             "github_url",
             "metadata",
             "knowledge_representation",
@@ -51,6 +107,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
             "processed_at",
             "version",
             "files",
+            "repository",
             "created_at",
             "updated_at",
         )
@@ -58,10 +115,12 @@ class SubmissionSerializer(serializers.ModelSerializer):
             "id",
             "student",
             "status",
+            "processing_stage",
             "knowledge_representation",
             "processing_error",
             "processed_at",
             "files",
+            "repository",
             "created_at",
             "updated_at",
         )
@@ -76,6 +135,24 @@ class SubmissionCreateSerializer(serializers.Serializer):
     def validate(self, attrs):
         if not attrs.get("file") and not attrs.get("files") and not attrs.get("github_url"):
             raise serializers.ValidationError("Provide a file upload and/or a GitHub URL.")
+        github_url = (attrs.get("github_url") or "").strip()
+        if github_url:
+            try:
+                parsed = parse_github_url(github_url)
+            except GithubUrlError as exc:
+                raise serializers.ValidationError({"github_url": str(exc)}) from exc
+            attrs["github_url"] = parsed.canonical_url
+        max_bytes = int(getattr(settings, "MAX_SUBMISSION_FILE_BYTES", 25 * 1024 * 1024))
+        uploads = []
+        if attrs.get("file"):
+            uploads.append(attrs["file"])
+        uploads.extend(attrs.get("files") or [])
+        for uploaded in uploads:
+            size = getattr(uploaded, "size", None)
+            if size is not None and size > max_bytes:
+                raise serializers.ValidationError(
+                    f"Each file must be under {max_bytes} bytes."
+                )
         return attrs
 
     @transaction.atomic

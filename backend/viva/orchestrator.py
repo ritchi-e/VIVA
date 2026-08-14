@@ -336,7 +336,9 @@ class VivaOrchestrator:
         next_excerpt = None
         if next_question:
             provenance = next_question.provenance or {}
-            next_excerpt = provenance.get("excerpt")
+            excerpt = provenance.get("excerpt")
+            if isinstance(excerpt, dict) and (excerpt.get("quote") or "").strip():
+                next_excerpt = excerpt
         return {
             "answer_id": str(answer.id) if answer else None,
             "evaluation": None,  # Evaluations run after the viva completes

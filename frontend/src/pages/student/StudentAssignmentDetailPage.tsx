@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { assignmentsApi, submissionsApi, vivaApi } from '@/lib/api'
 import { useAsync } from '@/hooks/useAsync'
@@ -10,7 +10,10 @@ import { ProgressPanel } from '@/components/ui/Spinner'
 import { ErrorState } from '@/components/layout/StateViews'
 import { PreparingVivaOverlay } from '@/components/viva/PreparingVivaOverlay'
 import { getApiErrorMessage } from '@/lib/api'
-import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
+import { PLATFORM_PROGRESS, SUBMISSION_STAGE_COPY } from '@/lib/progressCopy'
+
+const GITHUB_URL_RE = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/?$/
+const ACTIVE_STATUSES = new Set(['uploaded', 'queued', 'processing'])
 
 export function StudentAssignmentDetailPage() {
   const { id = '' } = useParams()
@@ -26,16 +29,37 @@ export function StudentAssignmentDetailPage() {
   const [message, setMessage] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const latestSubmission = submissions.data?.[0]
+  const processing = Boolean(latestSubmission && ACTIVE_STATUSES.has(latestSubmission.status))
+
+  useEffect(() => {
+    if (!latestSubmission || !processing) return
+    const timer = window.setInterval(() => {
+      void submissions.reload()
+    }, 4000)
+    return () => window.clearInterval(timer)
+  }, [latestSubmission?.id, latestSubmission?.status, processing, submissions.reload])
+
   if (assignment.loading) return <ProgressPanel copy={PLATFORM_PROGRESS.assignments} />
   if (assignment.error || !assignment.data) {
     return <ErrorState message={assignment.error ?? 'Not found'} onRetry={assignment.reload} />
   }
 
-  const latestSubmission = submissions.data?.[0]
+  const allowGithub = assignment.data.allow_github
+  const stageCopy =
+    SUBMISSION_STAGE_COPY[latestSubmission?.processing_stage || ''] || PLATFORM_PROGRESS.ingestingRepo
 
   const upload = async () => {
     if (!file && !githubUrl) {
       setError('Choose a file (PDF/DOCX/PPTX/ZIP) or provide a GitHub URL.')
+      return
+    }
+    if (githubUrl && !allowGithub) {
+      setError('GitHub submissions are not enabled for this assignment.')
+      return
+    }
+    if (githubUrl && !GITHUB_URL_RE.test(githubUrl.trim().replace(/\.git$/, ''))) {
+      setError('Use a public https://github.com/{owner}/{repo} URL.')
       return
     }
     setUploading(true)
@@ -44,11 +68,12 @@ export function StudentAssignmentDetailPage() {
     try {
       const form = new FormData()
       form.append('assignment', id)
-      if (githubUrl) form.append('github_url', githubUrl)
+      if (githubUrl) form.append('github_url', githubUrl.trim())
       if (file) form.append('file', file)
       await submissionsApi.create(form)
-      setMessage('Submission uploaded and queued for processing.')
+      setMessage('Submission received. We are preparing viva evidence from your work.')
       setFile(null)
+      setGithubUrl('')
       if (fileRef.current) fileRef.current.value = ''
       await submissions.reload()
     } catch (err) {
@@ -64,7 +89,7 @@ export function StudentAssignmentDetailPage() {
       return
     }
     if (latestSubmission.status !== 'ready') {
-      setError(`Submission status is "${latestSubmission.status}". Wait until processing is ready.`)
+      setError('Wait until processing is complete before starting the viva.')
       await submissions.reload()
       return
     }
@@ -114,11 +139,15 @@ export function StudentAssignmentDetailPage() {
             accept=".pdf,.docx,.pptx,.zip,application/pdf"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           />
-          <Input
-            value={githubUrl}
-            onChange={(e) => setGithubUrl(e.target.value)}
-            placeholder="https://github.com/org/repo (optional)"
-          />
+          {allowGithub ? (
+            <Input
+              value={githubUrl}
+              onChange={(e) => setGithubUrl(e.target.value)}
+              placeholder="https://github.com/org/repo"
+            />
+          ) : (
+            <p className="text-xs text-slate-500">This assignment does not accept GitHub repositories.</p>
+          )}
           <Button onClick={upload} loading={uploading} variant="secondary">
             Upload submission
           </Button>
@@ -127,18 +156,26 @@ export function StudentAssignmentDetailPage() {
       </Card>
       {latestSubmission ? (
         <Card className="mb-6">
-          <CardBody className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm text-slate-600">
-              Latest submission v{latestSubmission.version} — {latestSubmission.status}
+          <CardBody className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-slate-600">
+                Latest submission v{latestSubmission.version} — {latestSubmission.status}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => submissions.reload()}>
+                  Refresh status
+                </Button>
+                <Link to={`/student/submissions/${latestSubmission.id}`}>
+                  <Button variant="secondary">View submission</Button>
+                </Link>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => submissions.reload()}>
-                Refresh status
-              </Button>
-              <Link to={`/student/submissions/${latestSubmission.id}`}>
-                <Button variant="secondary">View submission</Button>
-              </Link>
-            </div>
+            {processing ? (
+              <div className="rounded-xl border border-teal-100 bg-teal-50/70 px-4 py-3">
+                <p className="font-display text-sm font-semibold text-teal-950">{stageCopy.title}</p>
+                <p className="mt-1 text-sm text-teal-900/70">{stageCopy.detail}</p>
+              </div>
+            ) : null}
           </CardBody>
         </Card>
       ) : null}
@@ -153,11 +190,11 @@ export function StudentAssignmentDetailPage() {
                     {s.state} · {s.questions_asked}/{s.question_budget}
                   </span>
                   <div className="flex gap-3">
-                    <Link to={`/student/viva/${s.id}`} className="text-blue-700 hover:underline">
+                    <Link to={`/student/viva/${s.id}`} className="text-teal-800 hover:underline">
                       Open
                     </Link>
                     {['COMPLETED', 'REVIEW_REQUIRED'].includes(s.state) ? (
-                      <Link to={`/student/results/${s.id}`} className="text-blue-700 hover:underline">
+                      <Link to={`/student/results/${s.id}`} className="text-teal-800 hover:underline">
                         Results
                       </Link>
                     ) : null}
@@ -169,7 +206,7 @@ export function StudentAssignmentDetailPage() {
         </Card>
       ) : null}
       {error ? <p className="mb-3 text-sm text-red-600">{error}</p> : null}
-      <Button onClick={startViva} loading={starting} disabled={!latestSubmission || starting}>
+      <Button onClick={startViva} loading={starting} disabled={!latestSubmission || starting || processing}>
         Start viva session
       </Button>
     </div>

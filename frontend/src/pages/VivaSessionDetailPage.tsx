@@ -79,6 +79,14 @@ export function VivaSessionDetailPage() {
                   </div>
                   <p className="mt-2 text-sm font-medium text-slate-900">{q.question_text}</p>
                   {q.concept ? <p className="mt-1 text-xs text-slate-500">Focus: {q.concept}</p> : null}
+                  {q.source_ref ? (
+                    <p className="mt-1 text-xs text-slate-500">Cited file: {q.source_ref}</p>
+                  ) : null}
+                  {q.excerpt?.quote ? (
+                    <blockquote className="mt-2 border-l-2 border-teal-200 pl-3 text-sm text-slate-600">
+                      {q.excerpt.quote}
+                    </blockquote>
+                  ) : null}
                 </div>
 
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">

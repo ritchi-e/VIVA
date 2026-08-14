@@ -51,7 +51,26 @@ def build_knowledge_nodes(submission: Submission, organization: Organization) ->
     for sf in submission.files.all():
         if sf.extracted_text:
             texts.append(sf.extracted_text[:8000])
-    if submission.github_url:
+    from django.core.exceptions import ObjectDoesNotExist
+
+    repo = None
+    try:
+        repo = submission.repository
+    except ObjectDoesNotExist:
+        repo = None
+    if repo:
+        from submissions.repository.profile import profile_summary_text
+
+        texts.append(profile_summary_text(repo.project_profile or {}))
+        for repo_file in repo.files.filter(indexed=True).order_by("path")[:12]:
+            snippet = (repo_file.extracted_text or "")[:2500]
+            if snippet:
+                texts.append(f"## {repo_file.path}\n{snippet}")
+    elif submission.github_url:
+        from submissions.models import SubmissionChunk
+
+        for chunk in SubmissionChunk.objects.filter(submission=submission).order_by("chunk_index")[:10]:
+            texts.append(f"## {chunk.source_ref or chunk.path}\n{chunk.content[:2000]}")
         texts.append(f"GitHub repository: {submission.github_url}")
     corpus = "\n\n".join(texts)[:24000]
     ai = AIService(organization=organization, user=submission.student)

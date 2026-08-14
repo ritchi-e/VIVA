@@ -115,7 +115,7 @@ services:
         condition: service_healthy
       backend:
         condition: service_started
-    command: celery -A config worker -l info --concurrency=2
+    command: celery -A config worker -l info --concurrency=2 -Q celery,ingestion
 
   celery-beat:
     build:

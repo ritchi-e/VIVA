@@ -76,6 +76,59 @@ export interface Rubric {
   criteria: RubricCriterion[]
 }
 
+export interface RepositoryFileSummary {
+  id: string
+  path: string
+  language: string
+  category: string
+  size_bytes: number
+  indexed: boolean
+  skip_reason: string
+}
+
+export interface RepositorySnapshot {
+  id: string
+  github_url: string
+  owner: string
+  repo: string
+  default_branch: string
+  commit_sha: string
+  status: string
+  files_indexed: number
+  files_skipped: number
+  total_bytes: number
+  extracted_chars: number
+  project_profile: {
+    stack?: string[]
+    languages?: Record<string, number>
+    entry_points?: string[]
+    top_directories?: Record<string, number>
+  }
+  error_message: string
+  files?: {
+    indexed: RepositoryFileSummary[]
+    skipped_sample: RepositoryFileSummary[]
+  }
+}
+
+export interface SubmissionStatus {
+  id: string
+  status: Submission['status']
+  stage: string
+  error: string
+  files_indexed: number | null
+  files_skipped: number | null
+  repository: {
+    owner: string
+    repo: string
+    commit_sha: string
+    status: string
+    files_indexed: number
+    files_skipped: number
+    stack: string[]
+  } | null
+}
+
 export interface Submission {
   id: string
   assignment: string
@@ -84,12 +137,14 @@ export interface Submission {
   student_email?: string
   student_name?: string
   status: 'uploaded' | 'queued' | 'processing' | 'ready' | 'failed'
+  processing_stage?: string
   github_url: string
   metadata: Record<string, unknown>
   processing_error: string
   processed_at: string | null
   version: number
   created_at?: string
+  repository?: RepositorySnapshot | null
 }
 
 export interface VivaSession {

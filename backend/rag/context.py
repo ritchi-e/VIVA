@@ -48,28 +48,8 @@ def retrieve_for_submission(
         vector,
         organization_id=organization.id,
         top_k=top_k,
+        query_text=query,
     )
-
-
-def format_chunks_for_conversation(chunks: list[dict[str, Any]], *, max_chars: int = 12000) -> str:
-    """Format chunks for live viva prompts — source_ref labels only, no excerpt numbers."""
-    if not chunks:
-        return "No submission excerpts available."
-    lines: list[str] = []
-    used = 0
-    for chunk in chunks:
-        ref = (chunk.get("source_ref") or "submission").strip()
-        header = f"[{ref}]"
-        body = (chunk.get("content") or "").strip()
-        block = f"{header}\n{body}\n"
-        if used + len(block) > max_chars:
-            remaining = max_chars - used
-            if remaining > 200:
-                lines.append(block[:remaining])
-            break
-        lines.append(block)
-        used += len(block)
-    return "\n".join(lines)
 
 
 def format_chunks_for_conversation(chunks: list[dict[str, Any]], *, max_chars: int = 12000) -> str:

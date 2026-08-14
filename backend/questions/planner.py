@@ -13,7 +13,8 @@ from rag.context import (
     retrieve_for_submission,
 )
 from rubrics.models import RubricCriterion
-from submissions.models import Submission, SubmissionChunk
+from submissions.metrics import CITATION_VALIDATION
+from submissions.models import QuestionCandidate, Submission, SubmissionChunk
 
 PLAN_SCHEMA = {
     "title": "question_plan",
@@ -200,29 +201,33 @@ def plan_questions(
 
     planning_query = build_planning_query(submission)
     rag_chunks = retrieve_for_submission(submission, organization, planning_query, top_k=12)
+    rag_chunks = _diversify_chunks(rag_chunks)
     excerpts = format_chunks_for_prompt(rag_chunks)
 
     outcome_lines = [f"- {lo.code}: {lo.description}" for lo in outcomes] or ["- None defined"]
     criterion_lines = [f"- {c.name} ({c.category})" for c in criteria] or ["- None defined"]
+    repo_context = _repository_planner_context(submission)
 
     prompt = (
         f"Assignment: {assignment.title}\n"
         f"Instructions: {assignment.instructions or assignment.description or 'N/A'}\n\n"
         f"Learning outcomes:\n" + "\n".join(outcome_lines) + "\n\n"
         f"Rubric criteria:\n" + "\n".join(criterion_lines) + "\n\n"
+        f"{repo_context}"
         f"## Submission excerpts (retrieved from the student's work)\n{excerpts}\n\n"
         f"Plan exactly {budget} oral viva questions that ONLY a student who wrote THIS submission could answer well.\n"
         "Requirements:\n"
-        "- Every question MUST be anchored to a concrete detail in the excerpts "
-        "(function/class/variable names, literals, control-flow choices, reported numbers, wording).\n"
-        "- Set source_quote to a short verbatim snippet copied from the Submission excerpts section ONLY "
-        "(never from assignment instructions or general knowledge).\n"
+        "- Every implementation question MUST be anchored to a concrete excerpt "
+        "(function/class names, file paths, literals, control-flow choices).\n"
+        "- Set source_quote to a short verbatim snippet copied from the Submission excerpts section ONLY.\n"
         "- Set source_chunk_id to that excerpt's id= value.\n"
-        "- Set concept to the specific submission detail being examined.\n"
-        "- BAD: 'What is an AVL tree?' / 'Why did you choose C++?' / 'Explain O(log n)' / "
-        "'What limitations do AVL trees have?' without citing their code.\n"
-        "- GOOD: ask about their rightRotate/leftRotate cases, insert(10..25) demo, deleteNode edge cases, "
-        "height updates, or another detail that appears in the excerpts.\n"
+        "- Set source_ref to the file path and line range when present (e.g. src/model.py:12-40).\n"
+        "- Set source_artifact to github when the excerpt is from a repository file, otherwise submission.\n"
+        "- Project-level questions (objective, architecture, data flow) are allowed only when multiple files "
+        "or README evidence support them.\n"
+        "- Assess understanding of the submitted implementation. Never claim the code executes correctly.\n"
+        "- BAD: 'What is an AVL tree?' / 'Why did you choose C++?' / generic CS theory.\n"
+        "- GOOD: ask about a named function, import edge, config value, or README claim that appears in excerpts.\n"
         "- Use varied question_type values: conceptual, methodology, implementation, results, "
         "critical_thinking, defense, limitations, application, submission_specific.\n"
         "- Map rubric_criterion_name and learning_outcome_code when relevant.\n"
@@ -289,6 +294,11 @@ def plan_questions(
                 chunk_id = matched_chunk.get("chunk_id") or chunk_id
             else:
                 source_quote = ""
+                CITATION_VALIDATION.labels(result="invalid_quote").inc()
+        else:
+            CITATION_VALIDATION.labels(result="valid").inc()
+        if qtype == PlannedQuestion.QuestionType.IMPLEMENTATION and not source_quote and not chunk_id:
+            CITATION_VALIDATION.labels(result="missing_implementation_citation").inc()
         concept_chunks = _chunks_for_planned_item(
             submission,
             organization,
@@ -560,3 +570,40 @@ def _fallback_wording(planned: PlannedQuestion, rag_chunks: list[dict]) -> str:
     return (
         f"Can you walk me through how your submission handles {planned.concept or 'this part of the work'}?"
     )
+
+
+def _diversify_chunks(chunks: list[dict]) -> list[dict]:
+    seen: set[str] = set()
+    ordered: list[dict] = []
+    for chunk in chunks:
+        key = chunk.get("path") or chunk.get("source_ref") or chunk.get("chunk_id") or ""
+        if key in seen:
+            continue
+        seen.add(str(key))
+        ordered.append(chunk)
+    for chunk in chunks:
+        if chunk not in ordered:
+            ordered.append(chunk)
+    return ordered
+
+
+def _repository_planner_context(submission: Submission) -> str:
+    from django.core.exceptions import ObjectDoesNotExist
+
+    try:
+        snapshot = submission.repository
+    except ObjectDoesNotExist:
+        snapshot = None
+    if not snapshot:
+        return ""
+    from submissions.repository.profile import profile_summary_text
+
+    profile = profile_summary_text(snapshot.project_profile or {})
+    candidates = list(QuestionCandidate.objects.filter(submission=submission).order_by("created_at")[:12])
+    lines = ["## Repository context (static analysis; code was not executed)\n", profile, ""]
+    if candidates:
+        lines.append("Question candidate hints:")
+        for candidate in candidates:
+            lines.append(f"- [{candidate.level}] {candidate.prompt_hint} (ref={candidate.source_ref})")
+        lines.append("")
+    return "\n".join(lines) + "\n"

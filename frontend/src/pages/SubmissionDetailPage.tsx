@@ -9,6 +9,7 @@ import { ProgressPanel } from '@/components/ui/Spinner'
 import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
 import { AssessmentReview } from '@/components/assessment/AssessmentReview'
+import { RepositorySummary } from '@/components/submissions/RepositorySummary'
 import type { Assessment } from '@/types'
 import { formatDate } from '@/lib/utils'
 
@@ -55,12 +56,10 @@ export function SubmissionDetailPage() {
           {submission.data.processing_error ? (
             <p className="text-red-600 sm:col-span-2">{submission.data.processing_error}</p>
           ) : null}
-          {submission.data.github_url ? (
-            <p className="sm:col-span-2">
-              <a href={submission.data.github_url} className="text-blue-700 hover:underline" target="_blank" rel="noreferrer">
-                GitHub repository
-              </a>
-            </p>
+          {submission.data.github_url || submission.data.repository ? (
+            <div className="sm:col-span-2">
+              <RepositorySummary submission={submission.data} />
+            </div>
           ) : null}
         </CardBody>
       </Card>

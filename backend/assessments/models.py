@@ -31,7 +31,7 @@ class Assessment(UUIDModel, SoftDeleteModel):
     recommended_followups = models.JSONField(default=list, blank=True)
     disclaimer = models.CharField(
         max_length=255,
-        default="AI-generated assessment. Instructor review required.",
+        default="AI assessment of submitted-implementation understanding. Instructor review required.",
     )
     reviewed_by = models.ForeignKey(
         "accounts.User",

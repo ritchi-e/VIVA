@@ -6,12 +6,13 @@ import tempfile
 from urllib.parse import urlparse
 
 from submissions.adapters.base import BaseSubmissionAdapter, ExtractedDocument
+from submissions.repository.urls import parse_github_url
 
 READ_EXTENSIONS = {".md", ".txt", ".py", ".java", ".c", ".cpp", ".h", ".js", ".ts", ".json", ".yaml", ".yml", ".rst"}
 
 
 def _clone_repo(url: str, tmpdir: str) -> None:
-    """Clone via GitPython; requires the system `git` binary (installed in the Docker image)."""
+    """Legacy clone fallback when static archive ingestion is disabled."""
     try:
         from git import Repo
     except ImportError as exc:
@@ -22,7 +23,7 @@ def _clone_repo(url: str, tmpdir: str) -> None:
 
 
 class GithubAdapter(BaseSubmissionAdapter):
-    """Clone repository read-only and extract text sources. Never executes student code."""
+    """Legacy git-clone extractor. Prefer submissions.repository.ingest for V1 static analysis."""
 
     file_type = "github"
 
@@ -31,6 +32,8 @@ class GithubAdapter(BaseSubmissionAdapter):
         parsed = urlparse(url)
         if not parsed.scheme:
             url = f"https://github.com/{url}"
+        parsed_repo = parse_github_url(url)
+        url = parsed_repo.canonical_url
         tmpdir = tempfile.mkdtemp(prefix="aiviva-github-")
         try:
             _clone_repo(url, tmpdir)

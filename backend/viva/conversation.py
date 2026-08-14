@@ -608,7 +608,8 @@ def generate_next_turn(
                         "2) Set mode: follow_up (weak/non_answer/partial) or advance (strong).\n"
                         "3) If mode=advance, set planned_id from Remaining coverage topics.\n"
                         "4) If mode=follow_up, write follow_up_question: ONE short question under 25 words "
-                        "about what the student missed; do not invent new topics outside the submission.\n"
+                        "about the student's stated design choice, data flow, failure mode, or trade-off. "
+                        "Do not invent new topics and do not claim their code runs.\n"
                         "5) acknowledgment optional, max 10 words, no Nice/Good/Great/Thanks.\n"
                         "Do not repeat Already asked questions."
                     ),

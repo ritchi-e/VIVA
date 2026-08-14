@@ -245,3 +245,20 @@ LOGGING = {
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = "DENY"
+
+# GitHub static ingestion (public repos only; never executes student code)
+GITHUB_STATIC_INGESTION_ENABLED = os.getenv("GITHUB_STATIC_INGESTION_ENABLED", "true").lower() == "true"
+GITHUB_API_TOKEN = os.getenv("GITHUB_API_TOKEN", "").strip()
+MAX_SUBMISSION_FILE_BYTES = int(os.getenv("MAX_SUBMISSION_FILE_BYTES", str(25 * 1024 * 1024)))
+MAX_REPO_ARCHIVE_BYTES = int(os.getenv("MAX_REPO_ARCHIVE_BYTES", str(40 * 1024 * 1024)))
+MAX_REPO_FILES = int(os.getenv("MAX_REPO_FILES", "400"))
+MAX_REPO_FILE_BYTES = int(os.getenv("MAX_REPO_FILE_BYTES", str(400 * 1024)))
+MAX_EXTRACTED_CHARS = int(os.getenv("MAX_EXTRACTED_CHARS", "400000"))
+REPO_FETCH_TIMEOUT_SEC = int(os.getenv("REPO_FETCH_TIMEOUT_SEC", "45"))
+REPO_PARSER_CONCURRENCY = int(os.getenv("REPO_PARSER_CONCURRENCY", "4"))
+EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "64"))
+
+CELERY_TASK_ROUTES = {
+    "submissions.tasks.process_submission_task": {"queue": "ingestion"},
+}
+CELERY_TASK_DEFAULT_QUEUE = "celery"

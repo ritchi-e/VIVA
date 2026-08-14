@@ -24,8 +24,8 @@ class SubmissionViewSet(TenantContextMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         org_id = self.get_organization_id()
         qs = Submission.objects.filter(assignment__course__organization_id=org_id).select_related(
-            "assignment", "student"
-        ).prefetch_related("files")
+            "assignment", "student", "repository"
+        ).prefetch_related("files", "repository__files")
         role = getattr(self.request.user, "active_role", None)
         if role == "student":
             qs = qs.filter(student=self.request.user)
@@ -58,5 +58,32 @@ class SubmissionViewSet(TenantContextMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="status")
     def status_detail(self, request, pk=None):
+        from django.core.exceptions import ObjectDoesNotExist
+
         submission = self.get_object()
-        return Response({"id": str(submission.id), "status": submission.status, "error": submission.processing_error})
+        try:
+            repository = submission.repository
+        except ObjectDoesNotExist:
+            repository = None
+        repo_payload = None
+        if repository:
+            repo_payload = {
+                "owner": repository.owner,
+                "repo": repository.repo,
+                "commit_sha": repository.commit_sha,
+                "status": repository.status,
+                "files_indexed": repository.files_indexed,
+                "files_skipped": repository.files_skipped,
+                "stack": (repository.project_profile or {}).get("stack") or [],
+            }
+        return Response(
+            {
+                "id": str(submission.id),
+                "status": submission.status,
+                "stage": submission.processing_stage,
+                "error": submission.processing_error,
+                "files_indexed": repository.files_indexed if repository else None,
+                "files_skipped": repository.files_skipped if repository else None,
+                "repository": repo_payload,
+            }
+        )

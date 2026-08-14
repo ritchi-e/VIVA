@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge'
 import { ProgressPanel } from '@/components/ui/Spinner'
 import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
+import { RepositorySummary } from '@/components/submissions/RepositorySummary'
 import { formatDate } from '@/lib/utils'
 
 export function StudentSubmissionPage() {
@@ -42,11 +43,7 @@ export function StudentSubmissionPage() {
           </p>
           <p>Submitted: {formatDate(data.created_at)}</p>
           {data.processed_at ? <p>Processed: {formatDate(data.processed_at)}</p> : null}
-          {data.github_url ? (
-            <a href={data.github_url} className="text-blue-700 hover:underline" target="_blank" rel="noreferrer">
-              {data.github_url}
-            </a>
-          ) : null}
+          {data.github_url || data.repository ? <RepositorySummary submission={data} /> : null}
           {data.processing_error ? <p className="text-red-600">{data.processing_error}</p> : null}
           <Link to={`/student/assignments/${data.assignment}`} className="inline-block text-blue-700 hover:underline">
             Back to assignment

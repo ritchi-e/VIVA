@@ -1,550 +1,688 @@
-import { useState, type ComponentType } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AnimatePresence, motion, useScroll, useTransform } from 'motion/react'
+import { ArrowUpRight, BarChart3, Menu, MessagesSquare, ShieldCheck, X } from 'lucide-react'
+import { LogoLight, LogoMarkLight, WordmarkLight } from '@/components/brand/Logo'
+import { LiquidChrome } from '@/components/landing/LiquidChrome'
 import {
-  ArrowRight,
-  BarChart3,
-  Check,
-  ClipboardCheck,
-  FileCode2,
-  Mail,
-  Menu,
-  MessagesSquare,
-  Mic,
-  ShieldCheck,
-  X,
-} from 'lucide-react'
-import { Logo, LogoMark } from '@/components/brand/Logo'
+  AsciiGlitch,
+  AuroraBloom,
+  FilmGrain,
+  GlowButton,
+  GridOverlay,
+  Marquee,
+  RippleRings,
+  SpotlightCard,
+  TiltCard,
+} from '@/components/landing/fx'
+import { GlitchText, NumberTicker, SparklesText, WordReveal } from '@/components/landing/text'
+import { DynamicIslandCTA } from '@/components/landing/DynamicIslandCTA'
+import { CardSwipe, type SwipeCard } from '@/components/landing/CardSwipe'
+import { BentoGrid } from '@/components/landing/Bento'
+import { PricingMatrix } from '@/components/landing/Pricing'
+import { SECTION, SHELL, TYPE } from '@/components/landing/tokens'
 import { cn } from '@/lib/utils'
 
 const CONTACT_EMAIL = 'hello@mokhik.com'
 
-const navLinks = [
-  { href: '#features', label: 'Features' },
-  { href: '#how-it-works', label: 'How it works' },
+const NAV = [
+  { href: '#showcase', label: 'Showcase' },
+  { href: '#platform', label: 'Platform' },
   { href: '#pricing', label: 'Pricing' },
   { href: '#contact', label: 'Contact' },
 ]
 
-const features: { icon: ComponentType<{ className?: string }>; title: string; body: string }[] = [
-  {
-    icon: FileCode2,
-    title: 'Grounded in their code',
-    body: 'Every question is traced back to a file, function, or commit in the student’s own submission. Anything the model cannot cite is discarded before it is ever asked.',
-  },
-  {
-    icon: MessagesSquare,
-    title: 'Adaptive follow-ups',
-    body: 'The examiner probes deeper when an answer is thin and moves on when a concept is proven, without circling back to ground it has already covered.',
-  },
-  {
-    icon: Mic,
-    title: 'Natural voice',
-    body: 'Students speak instead of typing. Transcription is primed with the vocabulary of your course and their repository, so domain terms come through accurately.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Monitored sessions',
-    body: 'Leaving the exam window starts a short countdown to return. Sessions stay under live monitoring, and anything unresolved is flagged for you.',
-  },
-  {
-    icon: ClipboardCheck,
-    title: 'Rubric-aligned scoring',
-    body: 'Results arrive as criterion-level scores with the transcript excerpt that justifies each one, so a grade is never a number without evidence.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Cohort analytics',
-    body: 'See score distributions, completion trends, and which rubric criteria a cohort consistently struggles with across every assignment.',
-  },
+const MARQUEE_ITEMS = [
+  'Repo-grounded questioning',
+  'Nova-3 speech',
+  'Adaptive follow-ups',
+  'Live session integrity',
+  'Rubric-aligned scoring',
+  'Cohort analytics',
+  'Zero hallucinated prompts',
+  'Evidence-linked grades',
 ]
 
-const steps = [
-  {
-    title: 'Set the assignment',
-    body: 'Create the assignment, define your rubric, and let students submit their repository. Mokhik indexes the code and prepares a question plan for each one.',
-  },
-  {
-    title: 'Student sits the viva',
-    body: 'A short, spoken oral exam in the browser. The examiner asks about the work in front of it, listens, and follows up while the session stays monitored.',
-  },
-  {
-    title: 'Review the evidence',
-    body: 'You get a transcript, per-criterion scores, integrity flags, and cohort analytics — enough to defend any grade you award.',
-  },
-]
+/* ------------------------------------------------------------------ *
+ * Section header — one component so every section shares the rhythm.
+ * ------------------------------------------------------------------ */
 
-const plans = [
-  {
-    name: 'Starter',
-    price: 'Free',
-    cadence: 'for one instructor',
-    blurb: 'Enough to run oral assessment across a single class.',
-    features: ['25 vivas per month', 'Repo-grounded question plans', 'Rubric scoring and transcripts', 'Email support'],
-    cta: 'Start free',
-    featured: false,
-    contactSales: false,
-  },
-  {
-    name: 'Department',
-    price: '$49',
-    cadence: 'per instructor / month',
-    blurb: 'For teaching teams running vivas at scale.',
-    features: [
-      'Unlimited vivas',
-      'Live proctoring and integrity reports',
-      'Cohort analytics dashboard',
-      'Google sign-in for staff and students',
-      'Priority support',
-    ],
-    cta: 'Get started',
-    featured: true,
-    contactSales: false,
-  },
-  {
-    name: 'Institution',
-    price: 'Custom',
-    cadence: 'annual agreement',
-    blurb: 'For faculty-wide or campus-wide rollout.',
-    features: ['SSO and LMS integration', 'Self-hosted deployment', 'Custom data retention', 'Onboarding and SLA'],
-    cta: 'Talk to us',
-    featured: false,
-    contactSales: true,
-  },
-]
-
-function SectionHeading({
+function SectionHead({
   eyebrow,
   title,
   body,
+  highlight,
+  align = 'center',
 }: {
   eyebrow: string
   title: string
   body?: string
+  highlight?: string[]
+  align?: 'center' | 'left'
 }) {
   return (
-    <div className="mx-auto max-w-2xl text-center">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-primary)]">
+    <div className={cn('max-w-2xl', align === 'center' && 'mx-auto text-center')}>
+      <motion.p
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6 }}
+        className={TYPE.eyebrow}
+      >
         {eyebrow}
-      </p>
-      <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-slate-900 text-balance sm:text-4xl">
-        {title}
+      </motion.p>
+      <h2 className={cn('mt-5', TYPE.h2)}>
+        <WordReveal text={title} highlight={highlight} />
       </h2>
-      {body ? <p className="mt-4 text-base leading-relaxed text-slate-600">{body}</p> : null}
+      {body ? (
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8, delay: 0.25 }}
+          className={cn('mt-6', TYPE.lead, align === 'center' && 'mx-auto')}
+        >
+          {body}
+        </motion.p>
+      ) : null}
     </div>
   )
 }
+
+/* ------------------------------------------------------------------ *
+ * Header
+ * ------------------------------------------------------------------ */
 
 function SiteHeader() {
   const [open, setOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-white/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
-        <Link to="/" aria-label="Mokhik home" onClick={() => setOpen(false)}>
-          <Logo markClassName="h-8" wordmarkClassName="h-[18px]" />
-        </Link>
-
-        <nav className="hidden items-center gap-8 md:flex">
-          {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="text-sm font-medium text-slate-600 transition hover:text-[var(--color-primary)]"
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-
-        <div className="hidden items-center gap-3 md:flex">
-          <Link
-            to="/login"
-            className="rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-          >
-            Sign in
-          </Link>
-          <Link
-            to="/register"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-teal-900/10 transition hover:bg-[var(--color-primary-hover)]"
-          >
-            Get started
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-
-        <button
-          type="button"
-          aria-label={open ? 'Close menu' : 'Open menu'}
-          aria-expanded={open}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 md:hidden"
-          onClick={() => setOpen((v) => !v)}
+    <motion.header
+      initial={{ y: -80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+      className="fixed inset-x-0 top-0 z-50 pt-4"
+    >
+      <div className={SHELL}>
+        <div
+          className={cn(
+            'flex h-16 items-center justify-between rounded-full border px-5 transition-all duration-500 sm:px-6',
+            scrolled
+              ? 'border-white/10 bg-black/65 backdrop-blur-2xl shadow-[0_20px_60px_-30px_rgba(0,0,0,1)]'
+              : 'border-transparent bg-transparent',
+          )}
         >
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
-      </div>
+          <Link to="/" aria-label="Mokhik home" onClick={() => setOpen(false)}>
+            <LogoLight markClassName="h-7" wordmarkClassName="h-[15px]" />
+          </Link>
 
-      {open ? (
-        <div className="border-t border-[var(--color-border)] bg-white px-5 pb-5 pt-3 md:hidden">
-          <nav className="flex flex-col">
-            {navLinks.map((link) => (
+          <nav className="hidden items-center gap-9 md:flex">
+            {NAV.map((item) => (
               <a
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className="rounded-xl px-2 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                key={item.href}
+                href={item.href}
+                className="group relative text-sm text-white/55 transition-colors hover:text-white"
               >
-                {link.label}
+                {item.label}
+                <span className="absolute -bottom-1.5 left-0 h-px w-0 bg-gradient-to-r from-[#2de2b2] to-transparent transition-all duration-400 group-hover:w-full" />
               </a>
             ))}
           </nav>
-          <div className="mt-3 flex flex-col gap-2">
-            <Link
-              to="/login"
-              className="rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-center text-sm font-semibold text-slate-800"
-            >
+
+          <div className="hidden items-center gap-3 md:flex">
+            <Link to="/login" className="text-sm text-white/60 transition-colors hover:text-white">
               Sign in
             </Link>
-            <Link
-              to="/register"
-              className="rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-center text-sm font-semibold text-white"
-            >
-              Get started
+            <Link to="/register">
+              <GlowButton className="px-5 py-2.5 text-[13px]">
+                Get started
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </GlowButton>
             </Link>
           </div>
+
+          <button
+            type="button"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white/70 md:hidden"
+          >
+            {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
         </div>
-      ) : null}
-    </header>
+
+        <AnimatePresence>
+          {open ? (
+            <motion.div
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.3 }}
+              className="mt-2 overflow-hidden rounded-[28px] border border-white/10 bg-black/85 p-5 backdrop-blur-2xl md:hidden"
+            >
+              {NAV.map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className="block border-b border-white/5 py-3.5 text-sm text-white/70 last:border-0"
+                >
+                  {item.label}
+                </a>
+              ))}
+              <div className="mt-4 flex flex-col gap-2.5">
+                <Link
+                  to="/login"
+                  className="rounded-full border border-white/12 py-3 text-center text-sm text-white/80"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  to="/register"
+                  className="rounded-full bg-gradient-to-b from-[#3fe9bd] to-[#0ebe92] py-3 text-center text-sm font-semibold text-[#03231e]"
+                >
+                  Get started
+                </Link>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+    </motion.header>
   )
 }
 
-function TranscriptPreview() {
+/* ------------------------------------------------------------------ *
+ * Hero
+ * ------------------------------------------------------------------ */
+
+function Hero() {
+  const { scrollY } = useScroll()
+  const shaderY = useTransform(scrollY, [0, 900], [0, 220])
+  const contentY = useTransform(scrollY, [0, 700], [0, -70])
+  const contentOpacity = useTransform(scrollY, [0, 620], [1, 0])
+
   return (
-    <div className="relative">
-      <div
-        aria-hidden
-        className="absolute -inset-6 -z-10 rounded-[2.5rem] bg-gradient-to-br from-[#0ebe92]/18 via-transparent to-[#076f65]/18 blur-2xl"
-      />
-      <div className="overflow-hidden rounded-3xl border border-[var(--color-border)] bg-white shadow-xl shadow-slate-900/5">
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-3.5">
-          <div className="flex items-center gap-2.5">
-            <LogoMark className="h-6" />
-            <span className="text-sm font-semibold text-slate-800">Viva · Compiler Design</span>
-          </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Monitored
-          </span>
+    <section className="relative flex min-h-[100svh] items-center overflow-hidden pt-28">
+      <motion.div style={{ y: shaderY }} className="absolute inset-0 -top-24 h-[125%]">
+        <LiquidChrome speed={0.3} />
+        <div className="absolute inset-0 bg-[#030303]/45" />
+        <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#030303] via-[#030303]/85 to-transparent" />
+        <div className="absolute inset-y-0 left-0 w-40 bg-gradient-to-r from-[#030303] to-transparent" />
+        <div className="absolute inset-y-0 right-0 w-40 bg-gradient-to-l from-[#030303] to-transparent" />
+      </motion.div>
+
+      <GridOverlay className="opacity-60" />
+      <FilmGrain />
+
+      <motion.div style={{ y: contentY, opacity: contentOpacity }} className={cn(SHELL, 'relative z-10')}>
+        <div className="mx-auto max-w-4xl text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.15 }}
+            className="flex justify-center"
+          >
+            <span className="inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 backdrop-blur-xl">
+              <LogoMarkLight className="h-4" />
+              <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/55">
+                Oral assessment infrastructure
+              </span>
+            </span>
+          </motion.div>
+
+          <h1 className={cn('mt-9', TYPE.display)}>
+            <SparklesText>
+              <WordReveal text="Submission ≠ Understanding." delay={0.25} play="mount" highlight={['Understanding']} />
+            </SparklesText>
+          </h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.85 }}
+            className={cn('mx-auto mt-8 max-w-xl', TYPE.lead)}
+          >
+            Mokhik runs a spoken viva on every submission — grounded in the student's own repository,
+            proctored end to end, and returned to you as evidence-linked rubric scores.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 1 }}
+            className="mt-11 flex flex-col items-center gap-5"
+          >
+            <DynamicIslandCTA />
+            <a href="#showcase" className="text-sm text-white/40 transition-colors hover:text-white/80">
+              or watch a session unfold ↓
+            </a>
+          </motion.div>
         </div>
+      </motion.div>
 
-        <div className="space-y-4 px-5 py-5">
-          <div className="flex gap-3">
-            <LogoMark className="mt-0.5 h-6 shrink-0" />
-            <div className="rounded-2xl rounded-tl-sm bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700">
-              In <span className="font-medium text-slate-900">parser/lexer.py</span> you cache tokens in
-              a dictionary keyed by source offset. What breaks if the same offset is re-scanned after an
-              edit?
-            </div>
-          </div>
+    </section>
+  )
+}
 
-          <div className="flex justify-end gap-3">
-            <div className="rounded-2xl rounded-tr-sm bg-[var(--color-primary)] px-4 py-3 text-sm leading-relaxed text-white">
-              The cached token would be stale, so I invalidate everything past the edit offset before
-              re-scanning.
-            </div>
-          </div>
+/* ------------------------------------------------------------------ *
+ * Trust marquee
+ * ------------------------------------------------------------------ */
 
-          <div className="flex gap-3">
-            <LogoMark className="mt-0.5 h-6 shrink-0" />
-            <div className="rounded-2xl rounded-tl-sm bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700">
-              Good. Walk me through where that invalidation actually happens in your code.
-            </div>
-          </div>
-        </div>
+function TrustStrip() {
+  const departments = [
+    'Computer Science',
+    'Software Engineering',
+    'Data Science',
+    'Information Systems',
+    'Cybersecurity',
+    'Applied Computing',
+  ]
 
-        <div className="grid grid-cols-3 gap-px border-t border-[var(--color-border)] bg-[var(--color-border)]">
-          {[
-            { label: 'Correctness', value: '8.5' },
-            { label: 'Depth', value: '7.8' },
-            { label: 'Ownership', value: '9.2' },
-          ].map((item) => (
-            <div key={item.label} className="bg-white px-4 py-3.5 text-center">
-              <p className="font-display text-lg font-semibold text-slate-900">{item.value}</p>
-              <p className="mt-0.5 text-[11px] uppercase tracking-wider text-slate-500">{item.label}</p>
-            </div>
-          ))}
-        </div>
+  return (
+    <section className="relative border-b border-white/6 py-16">
+      <div className={cn(SHELL, 'mb-10')}>
+        <p className={cn(TYPE.eyebrow, 'text-center')}>Built for the way faculties assess</p>
       </div>
+      <Marquee duration={38} gap="4rem">
+        {departments.map((department) => (
+          <span key={department} className="flex items-center gap-4 whitespace-nowrap">
+            <LogoMarkLight className="h-5 opacity-35" />
+            <span className="font-display text-lg font-semibold tracking-[-0.02em] text-white/30">
+              {department}
+            </span>
+          </span>
+        ))}
+      </Marquee>
+      <Marquee duration={46} gap="3rem" reverse className="mt-6">
+        {MARQUEE_ITEMS.map((item) => (
+          <span
+            key={item}
+            className="whitespace-nowrap rounded-full border border-white/8 px-5 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-white/35"
+          >
+            {item}
+          </span>
+        ))}
+      </Marquee>
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ * Showcase carousel
+ * ------------------------------------------------------------------ */
+
+function TranscriptVisual({ active }: { active: boolean }) {
+  return (
+    <div className="space-y-3">
+      {[
+        { who: 'mokhik', text: 'You cache tokens keyed by source offset. What breaks after an edit?' },
+        { who: 'student', text: 'The cached token goes stale, so I invalidate everything past the offset.' },
+        { who: 'mokhik', text: 'Show me where that invalidation actually happens.' },
+      ].map((line, index) => (
+        <motion.div
+          key={line.text}
+          initial={{ opacity: 0, y: 12 }}
+          animate={active ? { opacity: 1, y: 0 } : { opacity: 0.35, y: 0 }}
+          transition={{ delay: active ? 0.15 + index * 0.15 : 0, duration: 0.5 }}
+          className={cn(
+            'max-w-[85%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed',
+            line.who === 'student'
+              ? 'ml-auto bg-gradient-to-br from-[#0ebe92]/25 to-[#0ebe92]/10 text-white/85'
+              : 'bg-white/[0.04] text-white/60',
+          )}
+        >
+          {line.text}
+        </motion.div>
+      ))}
     </div>
   )
 }
 
-function Hero() {
+/** The grace window told as a story: focus drops, the student returns, nothing is penalised. */
+function IntegrityVisual({ active }: { active: boolean }) {
   return (
-    <section className="relative overflow-hidden">
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-[#0ebe92]/15 blur-3xl" />
-        <div className="absolute -right-20 top-24 h-72 w-72 rounded-full bg-[#076f65]/12 blur-3xl" />
+    <div className="rounded-2xl border border-white/8 bg-black/40 p-5">
+      <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.16em] text-white/30">
+        <span>Attention timeline</span>
+        <span>14:20 elapsed</span>
       </div>
 
-      <div className="mx-auto grid max-w-6xl items-center gap-14 px-5 py-20 sm:px-8 lg:grid-cols-2 lg:gap-16 lg:py-28">
-        <div className="animate-viva-fade-up">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#0ebe92]" />
-            AI oral assessment, grounded in real work
-          </span>
-
-          <h1 className="mt-6 font-display text-4xl font-semibold leading-[1.08] tracking-tight text-slate-900 text-balance sm:text-5xl lg:text-[3.4rem]">
-            Know who actually did the work.
-          </h1>
-
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-slate-600">
-            Mokhik runs a short oral viva on every submission. It asks about the student’s own code,
-            follows up on vague answers, and hands you a rubric-scored report backed by the transcript.
-          </p>
-
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link
-              to="/register"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-6 py-3.5 text-sm font-semibold text-white shadow-sm shadow-teal-900/15 transition hover:bg-[var(--color-primary-hover)]"
-            >
-              Get started free
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <a
-              href="#how-it-works"
-              className="inline-flex items-center justify-center rounded-xl border border-[var(--color-border)] bg-white px-6 py-3.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
-            >
-              See how it works
-            </a>
-          </div>
-
-          <p className="mt-5 text-sm text-slate-500">
-            No credit card required · Works with any Git repository
-          </p>
-        </div>
-
-        <div className="animate-viva-fade-up lg:pl-4">
-          <TranscriptPreview />
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function Features() {
-  return (
-    <section id="features" className="scroll-mt-24 border-t border-[var(--color-border)] bg-white/70">
-      <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-        <SectionHeading
-          eyebrow="Features"
-          title="An examiner that has read the submission"
-          body="Mokhik assesses the work in front of it. No generic question banks, no answers it cannot point to in the code."
+      <div className="relative mt-5 h-2 rounded-full bg-white/6">
+        <motion.div
+          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#0ebe92]/50 to-[#7ff5d3]"
+          initial={{ width: 0 }}
+          animate={{ width: active ? '100%' : '0%' }}
+          transition={{ duration: 1.8, ease: [0.16, 1, 0.3, 1] }}
         />
+        <motion.span
+          className="absolute -top-1 h-4 w-1 rounded-full bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.9)]"
+          style={{ left: '58%' }}
+          initial={{ opacity: 0, scaleY: 0.4 }}
+          animate={active ? { opacity: 1, scaleY: 1 } : { opacity: 0, scaleY: 0.4 }}
+          transition={{ delay: 1, duration: 0.4 }}
+        />
+      </div>
 
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature) => (
-            <div
-              key={feature.title}
-              className="rounded-2xl border border-[var(--color-border)] bg-white p-6 transition hover:border-[#076f65]/30 hover:shadow-lg hover:shadow-slate-900/5"
-            >
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#076f65]/8 text-[var(--color-primary)]">
-                <feature.icon className="h-5 w-5" />
-              </span>
-              <h3 className="mt-5 font-display text-lg font-semibold text-slate-900">{feature.title}</h3>
-              <p className="mt-2.5 text-sm leading-relaxed text-slate-600">{feature.body}</p>
-            </div>
-          ))}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={active ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+        transition={{ delay: 1.25, duration: 0.5 }}
+        className="mt-5 flex items-start gap-3"
+      >
+        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+        <p className="text-xs leading-relaxed text-white/45">
+          <span className="text-amber-300">Focus left the window at 09:41.</span> The student returned
+          after 2.4 seconds — inside the grace period, so the viva continued. Recorded in the report,
+          not held against them.
+        </p>
+      </motion.div>
+    </div>
+  )
+}
+
+function AnalyticsVisual({ active }: { active: boolean }) {
+  const bars = [42, 68, 55, 84, 72, 91, 63, 78]
+  return (
+    <div className="flex h-28 items-end gap-2.5">
+      {bars.map((value, index) => (
+        <motion.div
+          key={index}
+          className="flex-1 rounded-t-md bg-gradient-to-t from-[#0ebe92]/25 to-[#7ff5d3]/80"
+          initial={{ height: 0 }}
+          animate={{ height: active ? `${value}%` : '18%' }}
+          transition={{ duration: 0.8, delay: index * 0.05, ease: [0.16, 1, 0.3, 1] }}
+        />
+      ))}
+    </div>
+  )
+}
+
+const SHOWCASE: SwipeCard[] = [
+  {
+    id: 'conversation',
+    kicker: '01 — The conversation',
+    title: 'It probes, it does not quiz.',
+    body: 'Answers steer the session. Thin reasoning gets a follow-up; proven understanding moves the examiner on to new ground it has not already covered.',
+    icon: MessagesSquare,
+    accent: '#2de2b2',
+    visual: TranscriptVisual,
+  },
+  {
+    id: 'integrity',
+    kicker: '02 — The session',
+    title: 'Monitored without the theatre.',
+    body: 'Window focus, fullscreen state, and a live camera feed run for the length of the viva. A short grace window forgives accidents; everything else lands in your report.',
+    icon: ShieldCheck,
+    accent: '#7dd3fc',
+    visual: IntegrityVisual,
+  },
+  {
+    id: 'analytics',
+    kicker: '03 — The evidence',
+    title: 'Grades with a paper trail.',
+    body: 'Every criterion links back to the moment in the transcript that earned it, then rolls up into cohort trends you can act on before the next assignment.',
+    icon: BarChart3,
+    accent: '#a78bfa',
+    visual: AnalyticsVisual,
+  },
+]
+
+function Showcase() {
+  return (
+    <section id="showcase" className={cn(SECTION, 'scroll-mt-24')}>
+      <AuroraBloom className="opacity-50" />
+      <div className={cn(SHELL, 'relative')}>
+        <SectionHead
+          eyebrow="The session"
+          title="Watch a viva actually happen"
+          highlight={['actually']}
+          body="Three moments from a single assessment: the questioning, the monitoring, and the evidence that reaches you afterwards."
+        />
+        <div className="mt-20">
+          <CardSwipe cards={SHOWCASE} />
         </div>
       </div>
     </section>
   )
 }
 
-function HowItWorks() {
-  return (
-    <section id="how-it-works" className="scroll-mt-24 border-t border-[var(--color-border)]">
-      <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-        <SectionHeading
-          eyebrow="How it works"
-          title="Three steps, then it runs itself"
-          body="Set it up once per assignment. Every submission after that gets the same defensible oral assessment."
-        />
+/* ------------------------------------------------------------------ *
+ * Platform bento
+ * ------------------------------------------------------------------ */
 
-        <ol className="mt-14 grid gap-8 md:grid-cols-3">
-          {steps.map((step, index) => (
-            <li key={step.title} className="relative">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-primary)] font-display text-sm font-semibold text-white">
-                {index + 1}
-              </span>
-              <h3 className="mt-5 font-display text-lg font-semibold text-slate-900">{step.title}</h3>
-              <p className="mt-2.5 text-sm leading-relaxed text-slate-600">{step.body}</p>
-            </li>
-          ))}
-        </ol>
+function Platform() {
+  return (
+    <section id="platform" className={cn(SECTION, 'scroll-mt-24 border-t border-white/6')}>
+      <GridOverlay size={72} className="opacity-40" />
+      <div className={cn(SHELL, 'relative')}>
+        <SectionHead
+          eyebrow="The platform"
+          title="Four systems, one defensible grade"
+          highlight={['defensible']}
+          body="Grounding, speech, integrity, and scoring are separate subsystems that each refuse to guess."
+        />
+        <BentoGrid />
       </div>
     </section>
   )
 }
 
-const planCtaClass =
-  'mt-8 inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition'
+/* ------------------------------------------------------------------ *
+ * Metrics
+ * ------------------------------------------------------------------ */
 
-const planCtaTone = (featured: boolean) =>
-  featured
-    ? 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]'
-    : 'border border-[var(--color-border)] text-slate-800 hover:bg-slate-50'
+function Metrics() {
+  const stats = [
+    { value: 5, suffix: 's', label: 'Grace window before a session closes' },
+    { value: 3, suffix: '', label: 'Independent checks before a question ships' },
+    { value: 100, suffix: '%', label: 'Of submissions can be assessed orally' },
+  ]
+
+  return (
+    <section className="relative border-y border-white/6 py-20">
+      <div className={cn(SHELL, 'grid gap-12 sm:grid-cols-3')}>
+        {stats.map((stat, index) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 28 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, delay: index * 0.12 }}
+            className="text-center sm:text-left"
+          >
+            <p className="font-display text-6xl font-semibold tracking-[-0.05em] text-white">
+              <NumberTicker value={stat.value} suffix={stat.suffix} />
+            </p>
+            <p className="mt-4 text-sm leading-relaxed text-white/45">{stat.label}</p>
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ * Pricing
+ * ------------------------------------------------------------------ */
 
 function Pricing() {
   return (
-    <section id="pricing" className="scroll-mt-24 border-t border-[var(--color-border)] bg-white/70">
-      <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-        <SectionHeading
+    <section id="pricing" className={cn(SECTION, 'scroll-mt-24')}>
+      <AuroraBloom className="opacity-40" />
+      <div className={cn(SHELL, 'relative')}>
+        <SectionHead
           eyebrow="Pricing"
-          title="Priced per instructor, not per student"
-          body="Start free on a single class. Move up when oral assessment becomes how your department grades."
+          title="Start free, scale when the cohort grows"
+          highlight={['free']}
+          body="Fixed packages sized for a class, a course, or a faculty. Talk to us if you need something built around how you teach."
         />
-
-        <div className="mt-14 grid gap-6 lg:grid-cols-3">
-          {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className={cn(
-                'flex flex-col rounded-2xl border bg-white p-7',
-                plan.featured
-                  ? 'border-[var(--color-primary)] shadow-xl shadow-teal-900/10 lg:-mt-4 lg:pb-10'
-                  : 'border-[var(--color-border)]',
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-lg font-semibold text-slate-900">{plan.name}</h3>
-                {plan.featured ? (
-                  <span className="rounded-full bg-[#0ebe92]/12 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-primary)]">
-                    Popular
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="mt-5 flex items-baseline gap-1.5">
-                <span className="font-display text-4xl font-semibold tracking-tight text-slate-900">
-                  {plan.price}
-                </span>
-                <span className="text-sm text-slate-500">{plan.cadence}</span>
-              </div>
-              <p className="mt-3 text-sm text-slate-600">{plan.blurb}</p>
-
-              <ul className="mt-6 flex-1 space-y-3">
-                {plan.features.map((item) => (
-                  <li key={item} className="flex gap-2.5 text-sm text-slate-700">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#0ebe92]" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-
-              {plan.contactSales ? (
-                <a href="#contact" className={cn(planCtaClass, planCtaTone(plan.featured))}>
-                  {plan.cta}
-                </a>
-              ) : (
-                <Link to="/register" className={cn(planCtaClass, planCtaTone(plan.featured))}>
-                  {plan.cta}
-                </Link>
-              )}
-            </div>
-          ))}
-        </div>
+        <PricingMatrix />
       </div>
     </section>
   )
 }
+
+/* ------------------------------------------------------------------ *
+ * Contact
+ * ------------------------------------------------------------------ */
 
 function Contact() {
   return (
-    <section id="contact" className="scroll-mt-24 border-t border-[var(--color-border)]">
-      <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
-        <div className="relative overflow-hidden rounded-3xl bg-[var(--color-primary)] px-8 py-14 text-center sm:px-14">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full bg-[#0ebe92]/25 blur-3xl"
-          />
-          <div className="relative">
-            <h2 className="font-display text-3xl font-semibold tracking-tight text-white text-balance sm:text-4xl">
-              Bring oral assessment back to your course
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-white/80">
-              Tell us about your cohort size and how you assess today. We will show you what a Mokhik
-              viva looks like on one of your own assignments.
-            </p>
-            <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-              <a
-                href={`mailto:${CONTACT_EMAIL}?subject=Mokhik%20demo`}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-white/90"
-              >
-                <Mail className="h-4 w-4" />
-                Book a demo
-              </a>
-              <Link
-                to="/register"
-                className="inline-flex items-center justify-center rounded-xl border border-white/30 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
-              >
-                Create an account
-              </Link>
+    <section id="contact" className={cn(SECTION, 'scroll-mt-24')}>
+      <div className={cn(SHELL, 'relative')}>
+        <TiltCard max={4}>
+          <SpotlightCard className="overflow-hidden px-8 py-20 text-center sm:px-16">
+            <RippleRings className="opacity-70" />
+            <div className="relative">
+              <LogoMarkLight className="mx-auto h-12" />
+              <h2 className={cn('mx-auto mt-9 max-w-2xl', TYPE.h2)}>
+                <WordReveal text="Bring the oral exam back" highlight={['oral']} />
+              </h2>
+              <p className={cn('mx-auto mt-6 max-w-lg', TYPE.lead)}>
+                Send us one assignment. We will run a Mokhik viva on it and walk you through the report
+                it produces.
+              </p>
+              <div className="mt-11 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                <a href={`mailto:${CONTACT_EMAIL}?subject=Mokhik%20demo`}>
+                  <GlowButton>
+                    Book a demo
+                    <ArrowUpRight className="h-4 w-4" />
+                  </GlowButton>
+                </a>
+                <Link to="/register">
+                  <GlowButton tone="ghost">Create an account</GlowButton>
+                </Link>
+              </div>
+              <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.2em] text-white/30">
+                <GlitchText text={CONTACT_EMAIL} />
+              </p>
             </div>
-            <p className="mt-6 text-sm text-white/70">
-              Or email us at{' '}
-              <a className="font-medium text-white underline underline-offset-4" href={`mailto:${CONTACT_EMAIL}`}>
-                {CONTACT_EMAIL}
-              </a>
-            </p>
-          </div>
-        </div>
+          </SpotlightCard>
+        </TiltCard>
       </div>
     </section>
   )
 }
 
+/* ------------------------------------------------------------------ *
+ * Footer
+ * ------------------------------------------------------------------ */
+
+type FooterLink = { label: string; href: string; internal?: boolean }
+
 function SiteFooter() {
+  const columns: { title: string; links: FooterLink[] }[] = [
+    {
+      title: 'Product',
+      links: [
+        { label: 'Showcase', href: '#showcase' },
+        { label: 'Platform', href: '#platform' },
+        { label: 'Pricing', href: '#pricing' },
+      ],
+    },
+    {
+      title: 'Access',
+      links: [
+        { label: 'Sign in', href: '/login', internal: true },
+        { label: 'Create account', href: '/register', internal: true },
+      ],
+    },
+    {
+      title: 'Company',
+      links: [
+        { label: 'Contact', href: '#contact' },
+        { label: `Email ${CONTACT_EMAIL}`, href: `mailto:${CONTACT_EMAIL}` },
+      ],
+    },
+  ]
+
   return (
-    <footer className="border-t border-[var(--color-border)] bg-white/70">
-      <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8">
-        <div className="flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-between">
+    <footer className="relative overflow-hidden border-t border-white/6">
+      <AsciiGlitch className="mk-grid-fade" opacity={0.14} />
+      <div className={cn(SHELL, 'relative py-20')}>
+        <div className="grid gap-14 lg:grid-cols-[1.4fr_2fr]">
           <div>
-            <Logo markClassName="h-8" wordmarkClassName="h-[18px]" />
-            <p className="mt-3 max-w-xs text-sm text-slate-500">
-              Oral assessment that stays grounded in the student’s own work.
+            <LogoLight markClassName="h-9" wordmarkClassName="h-5" />
+            <p className="mt-5 max-w-xs text-sm leading-relaxed text-white/40">
+              Oral assessment infrastructure that stays grounded in the student's own work.
             </p>
           </div>
-          <nav className="flex flex-wrap gap-x-7 gap-y-3">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="text-sm text-slate-600 transition hover:text-[var(--color-primary)]"
-              >
-                {link.label}
-              </a>
+
+          <div className="grid grid-cols-2 gap-10 sm:grid-cols-3">
+            {columns.map((column) => (
+              <div key={column.title}>
+                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/30">
+                  {column.title}
+                </p>
+                <ul className="mt-5 space-y-3.5">
+                  {column.links.map((link) => (
+                    <li key={link.label}>
+                      {link.internal ? (
+                        <Link to={link.href} className="text-sm text-white/55 transition-colors hover:text-[#7ff5d3]">
+                          {link.label}
+                        </Link>
+                      ) : (
+                        <a href={link.href} className="text-sm text-white/55 transition-colors hover:text-[#7ff5d3]">
+                          {link.label}
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-            <Link to="/login" className="text-sm text-slate-600 transition hover:text-[var(--color-primary)]">
-              Sign in
-            </Link>
-          </nav>
+          </div>
         </div>
-        <p className="mt-10 border-t border-[var(--color-border)] pt-6 text-xs text-slate-500">
-          © {new Date().getFullYear()} Mokhik. All rights reserved.
-        </p>
+
+        <div className="mt-16 flex flex-col gap-6 border-t border-white/6 pt-8 sm:flex-row sm:items-end sm:justify-between">
+          <WordmarkLight className="h-8 opacity-10" />
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/25">
+            © {new Date().getFullYear()} Mokhik — All rights reserved
+          </p>
+        </div>
       </div>
     </footer>
   )
 }
 
+/* ------------------------------------------------------------------ *
+ * Page
+ * ------------------------------------------------------------------ */
+
 export function HomePage() {
+  useEffect(() => {
+    // The app shell is a light theme; scope the ink background to this route only.
+    document.body.classList.add('mk-dark')
+    return () => document.body.classList.remove('mk-dark')
+  }, [])
+
+  useEffect(() => {
+    // The router owns the URL, so a hash deep link has to be resolved after mount.
+    const { hash } = window.location
+    if (!hash || hash.length < 2) return
+    const target = document.querySelector(hash)
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }))
+  }, [])
+
   return (
-    <div className="min-h-screen">
+    <div className="relative min-h-screen overflow-x-clip bg-[#030303] text-white">
       <SiteHeader />
       <main>
         <Hero />
-        <Features />
-        <HowItWorks />
+        <TrustStrip />
+        <Showcase />
+        <Platform />
+        <Metrics />
         <Pricing />
         <Contact />
       </main>

@@ -34,6 +34,13 @@
     @apply border-[var(--color-border)];
   }
 
+  /* Landing route opts the document into the dark brand canvas. */
+  body.mk-dark {
+    background-color: #030303;
+    background-image: none;
+    color: #ffffff;
+  }
+
   h1,
   h2,
   .font-display {
@@ -44,6 +51,105 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* ---------- landing page effects ---------- */
+
+  @keyframes mk-marquee-x {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(calc(-100% - var(--mk-gap, 2rem)));
+    }
+  }
+
+  @keyframes mk-shine {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 200% 50%;
+    }
+  }
+
+  @keyframes mk-border-spin {
+    to {
+      --mk-angle: 360deg;
+    }
+  }
+
+  @keyframes mk-ripple {
+    0% {
+      transform: scale(0.85);
+      opacity: 0.35;
+    }
+    100% {
+      transform: scale(1.6);
+      opacity: 0;
+    }
+  }
+
+  @keyframes mk-sparkle {
+    0%,
+    100% {
+      transform: scale(0) rotate(0deg);
+      opacity: 0;
+    }
+    45% {
+      transform: scale(1) rotate(90deg);
+      opacity: 1;
+    }
+  }
+
+  @keyframes mk-scan {
+    0% {
+      transform: translateY(-120%);
+    }
+    100% {
+      transform: translateY(320%);
+    }
+  }
+
+  @keyframes mk-drift {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0);
+    }
+    50% {
+      transform: translate3d(0, -14px, 0);
+    }
+  }
+
+  .mk-marquee-track {
+    animation: mk-marquee-x var(--mk-duration, 40s) linear infinite;
+  }
+
+  .mk-marquee:hover .mk-marquee-track {
+    animation-play-state: paused;
+  }
+
+  .mk-grid-fade {
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 20%, transparent 78%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 20%, transparent 78%);
+  }
+
+  .mk-noise {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E");
+  }
+
+  @property --mk-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mk-marquee-track,
+    .mk-shine,
+    .mk-spin-border {
+      animation: none !important;
+    }
   }
 
   @keyframes viva-breathe {

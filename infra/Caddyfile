@@ -1,0 +1,38 @@
+# TLS terminates here. Let's Encrypt issues certs once DNS A/AAAA records
+# for {$DOMAIN} point at this host and ports 80/443 are open.
+
+{$DOMAIN:mokhik.online}, www.{$DOMAIN:mokhik.online} {
+	encode gzip zstd
+
+	# Force apex if someone hits www
+	@www host www.{$DOMAIN:mokhik.online}
+	redir @www https://{$DOMAIN:mokhik.online}{uri} permanent
+
+	# Django API + admin + static (WhiteNoise)
+	@django path /api/* /admin* /static/*
+	handle @django {
+		reverse_proxy backend:8000
+	}
+
+	# Live viva WebSockets
+	handle /ws/* {
+		reverse_proxy backend:8000
+	}
+
+	# SPA
+	handle {
+		reverse_proxy frontend:80
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

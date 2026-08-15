@@ -40,7 +40,7 @@ const TIERS: Tier[] = [
   {
     name: 'Faculty Pro',
     price: 11999,
-    blurb: '100 students · 3 assessments/student',
+    blurb: '100+ students · 3 assessments/student',
     features: ['5–12 questions per assessment', 'Custom rubrics and assessment controls'],
     cta: 'Get Started',
   },

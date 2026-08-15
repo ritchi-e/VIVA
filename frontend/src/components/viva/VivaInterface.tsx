@@ -37,6 +37,8 @@ const SILENCE_MS = 2500
 const MAX_LISTEN_MS = 40_000
 const POST_SPEECH_DELAY_MS = 150
 const MIN_LISTEN_MS = 3000
+/** Close the turn early when the student never starts answering. */
+const NO_SPEECH_MS = 20_000
 
 interface VivaInterfaceProps {
   sessionId: string
@@ -87,7 +89,6 @@ export function VivaInterface({
   const [audioStarted, setAudioStarted] = useState(initialComplete)
   const [finishing, setFinishing] = useState(false)
   const [awaySeconds, setAwaySeconds] = useState<number | null>(null)
-  const [monitoringOn, setMonitoringOn] = useState(false)
   const [selectedVoice, setSelectedVoice] = useState<ExaminerVoiceChoice>('siya')
   const [previewingVoice, setPreviewingVoice] = useState<ExaminerVoiceChoice | null>(null)
   const selectedVoiceRef = useRef<ExaminerVoiceChoice>('siya')
@@ -106,7 +107,6 @@ export function VivaInterface({
   const lastHandledQuestionRef = useRef<string | null>(null)
   const submittingRef = useRef(false)
   const listenTimersRef = useRef<{ silence?: number; max?: number }>({})
-  const lastSpeechAtRef = useRef(0)
   const hadSpeechRef = useRef(false)
   const pendingQuestionRef = useRef<PendingQuestion | null>(
     initialQuestionId && initialQuestionText
@@ -157,7 +157,6 @@ export function VivaInterface({
 
   const stopMonitoring = useCallback(() => {
     monitorEnabledRef.current = false
-    setMonitoringOn(false)
     setAwaySeconds(null)
     if (graceTimerRef.current) {
       window.clearTimeout(graceTimerRef.current)
@@ -277,7 +276,6 @@ export function VivaInterface({
 
     finishingListenRef.current = false
     hadSpeechRef.current = false
-    lastSpeechAtRef.current = Date.now()
     listenStartedAtRef.current = Date.now()
     setLiveTranscript('Listening…')
     setPhase('listening')
@@ -286,17 +284,19 @@ export function VivaInterface({
       const session = await startVoiceSession((active) => {
         if (!active || finishingListenRef.current) return
         hadSpeechRef.current = true
-        lastSpeechAtRef.current = Date.now()
         setLiveTranscript((prev) => (prev ? prev : 'Listening…'))
       })
       voiceSessionRef.current = session
 
       listenTimersRef.current.silence = window.setInterval(() => {
-        if (finishingListenRef.current || !hadSpeechRef.current) return
-        if (Date.now() - lastSpeechAtRef.current >= SILENCE_MS) {
-          void finishListening()
+        const active = voiceSessionRef.current
+        if (!active || finishingListenRef.current) return
+        if (active.hasSpeech()) {
+          if (active.silenceMs() >= SILENCE_MS) void finishListening()
+          return
         }
-      }, 250)
+        if (Date.now() - listenStartedAtRef.current >= NO_SPEECH_MS) void finishListening()
+      }, 200)
 
       listenTimersRef.current.max = window.setTimeout(() => {
         void finishListening()
@@ -410,7 +410,6 @@ export function VivaInterface({
     }
 
     monitorEnabledRef.current = true
-    setMonitoringOn(true)
     setAudioStarted(true)
 
     const pending = pendingQuestionRef.current
@@ -811,12 +810,6 @@ export function VivaInterface({
         </div>
 
         <VivaOrb phase={activePhase} />
-
-        {monitoringOn && phase !== 'terminated' && phase !== 'complete' ? (
-          <p className="mt-4 rounded-full border border-teal-400/25 bg-teal-500/10 px-4 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-teal-100/80">
-            Live monitoring on
-          </p>
-        ) : null}
 
         <div className="mt-7 max-w-lg text-center animate-viva-fade-up" key={statusTitle}>
           <p className="font-display text-xl font-semibold tracking-tight text-white sm:text-2xl">

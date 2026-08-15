@@ -414,6 +414,59 @@ class VivaOrchestrator:
         self._enqueue_post_process()
         return self.session
 
+    def terminate_integrity(self, *, reason: str, metadata: dict[str, Any] | None = None) -> VivaSession:
+        """End a live viva for an integrity violation without running normal evaluation."""
+        self._refresh()
+        if self.session.state == VivaSession.State.FAILED:
+            return self.session
+        if self.session.state not in (
+            VivaSession.State.IN_PROGRESS,
+            VivaSession.State.PAUSED,
+            VivaSession.State.READY,
+        ):
+            return self.session
+
+        details = dict(metadata or {})
+        details["reason"] = reason
+        details["at"] = timezone.now().isoformat()
+        config = dict(self.session.config or {})
+        config["integrity_termination"] = details
+        self.session.config = config
+        if reason == "grace_expired":
+            self.session.error_message = (
+                "Viva stopped: student left the exam window for more than 5 seconds."
+            )
+        elif reason == "camera_denied":
+            self.session.error_message = "Viva stopped: camera access is required for live monitoring."
+        else:
+            self.session.error_message = f"Viva stopped for integrity: {reason}."
+
+        if self.session.state == VivaSession.State.READY:
+            # Skip start; fail from READY (allowed).
+            self._transition(VivaSession.State.FAILED)
+        else:
+            self._transition(VivaSession.State.FAILED)
+        self.session.completed_at = timezone.now()
+        self.session.save(update_fields=["config", "error_message", "completed_at", "updated_at"])
+        self._enqueue_integrity_notice(reason)
+        return self.session
+
+    def _enqueue_integrity_notice(self, reason: str) -> None:
+        from django.db import transaction
+
+        session_id = str(self.session.id)
+        org_id = str(self.organization.id)
+
+        def _dispatch() -> None:
+            try:
+                from viva.tasks import notify_integrity_termination_task
+
+                notify_integrity_termination_task.delay(session_id, org_id, reason)
+            except Exception:
+                logger.exception("Failed to enqueue integrity notice for session %s", session_id)
+
+        transaction.on_commit(_dispatch)
+
     def _enqueue_post_process(self) -> None:
         from django.db import transaction
 

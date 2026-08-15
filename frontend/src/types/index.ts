@@ -164,6 +164,25 @@ export interface VivaSession {
   completed_at: string | null
   error_message: string
   created_at?: string
+  integrity_terminated?: boolean
+  integrity_termination?: {
+    reason?: string
+    at?: string
+    hidden_ms?: number
+  } | null
+  integrity_events?: Array<{
+    id: string
+    event_type: string
+    client_ts?: string | null
+    created_at?: string
+  }>
+  proctor_frames?: Array<{
+    id: string
+    captured_at: string
+    content_type: string
+    byte_size: number
+    url: string
+  }>
 }
 
 export interface VivaAnswerEvaluation {
@@ -285,6 +304,7 @@ export interface DashboardRecentSession {
   started_at: string | null
   completed_at: string | null
   created_at: string
+  integrity_terminated?: boolean
 }
 
 export interface DashboardMetrics {
@@ -300,12 +320,25 @@ export interface DashboardMetrics {
     completed: number
     in_progress: number
     failed: number
+    integrity_terminated?: number
     total: number
   }
   average_assessment: number | null
   assessment_distribution: { status: string; count: number }[]
   students_requiring_review: number
   recent_sessions: DashboardRecentSession[]
+  sessions_by_day?: { date: string | null; completed: number; failed: number; total: number }[]
+  scores_by_week?: { week: string | null; average: number | null; count: number }[]
+  score_buckets?: { bucket: string; count: number }[]
+  by_assignment?: {
+    assignment_id: string
+    assignment_title: string
+    total: number
+    completed: number
+    failed: number
+  }[]
+  criterion_averages?: { name: string; average: number; count: number }[]
+  integrity_terminations?: number
 }
 
 export type VivaExcerpt = {

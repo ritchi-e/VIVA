@@ -1,6 +1,7 @@
 from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -32,7 +33,7 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
         qs = (
             VivaSession.objects.filter(assignment__course__organization_id=org_id)
             .select_related("student", "assignment", "submission")
-            .prefetch_related("questions")
+            .prefetch_related("questions", "integrity_events", "proctor_frames")
         )
         role = getattr(self.request.user, "active_role", None)
         if role == "student":
@@ -40,16 +41,29 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
         assignment_id = self.request.query_params.get("assignment")
         student_id = self.request.query_params.get("student")
         state = self.request.query_params.get("state")
+        integrity = (self.request.query_params.get("integrity") or "").lower()
         if assignment_id:
             qs = qs.filter(assignment_id=assignment_id)
         if student_id:
             qs = qs.filter(student_id=student_id)
         if state:
             qs = qs.filter(state=state)
+        if integrity in ("1", "true", "yes"):
+            qs = qs.filter(config__has_key="integrity_termination")
         return qs.order_by("-created_at")
 
     def get_permissions(self):
-        if self.action in ("create", "start", "answer", "speak", "finish"):
+        if self.action in (
+            "create",
+            "start",
+            "answer",
+            "speak",
+            "finish",
+            "transcribe",
+            "stt_config",
+            "integrity",
+            "proctor_frames",
+        ):
             return [IsAuthenticated(), IsStudent()]
         return super().get_permissions()
 
@@ -126,6 +140,78 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
 
         qs = session.questions.prefetch_related("attempts__answers__evaluation").order_by("sequence")
         return Response(VivaQuestionSerializer(qs, many=True).data)
+
+    @action(detail=True, methods=["get"], url_path="stt-config")
+    def stt_config(self, request, pk=None):
+        """Return STT provider info and project keyterms for Deepgram Nova-3 prompting."""
+        from django.conf import settings as dj_settings
+
+        from viva.stt_context import keyterms_for_session
+
+        session = self.get_object()
+        provider = (getattr(dj_settings, "STT_PROVIDER", "") or "").lower().strip()
+        has_deepgram = bool((getattr(dj_settings, "DEEPGRAM_API_KEY", "") or "").strip())
+        if provider in ("", "auto"):
+            provider = "deepgram" if has_deepgram else "mock"
+        keyterms = keyterms_for_session(session) if provider == "deepgram" else []
+        return Response(
+            {
+                "provider": provider,
+                "model": getattr(dj_settings, "DEEPGRAM_STT_MODEL", "nova-3"),
+                "keyterms": keyterms,
+                "configured": provider == "deepgram" and has_deepgram,
+            }
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="transcribe",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def transcribe(self, request, pk=None):
+        """Transcribe student audio with Deepgram Nova-3, biased by project keyterms."""
+        session = self.get_object()
+        upload = request.FILES.get("audio") or request.FILES.get("file")
+        if not upload:
+            return Response({"detail": "audio file is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        audio_bytes = upload.read()
+        if not audio_bytes:
+            return Response({"detail": "audio file was empty."}, status=status.HTTP_400_BAD_REQUEST)
+        max_bytes = 8 * 1024 * 1024
+        if len(audio_bytes) > max_bytes:
+            return Response({"detail": "audio file is too large."}, status=status.HTTP_400_BAD_REQUEST)
+
+        content_type = (getattr(upload, "content_type", None) or "audio/webm").split(";")[0].strip()
+        if content_type in ("application/octet-stream", ""):
+            name = (getattr(upload, "name", "") or "").lower()
+            if name.endswith(".wav"):
+                content_type = "audio/wav"
+            elif name.endswith(".mp3"):
+                content_type = "audio/mpeg"
+            elif name.endswith(".ogg"):
+                content_type = "audio/ogg"
+            else:
+                content_type = "audio/webm"
+
+        from ai.providers import get_stt_provider
+        from viva.stt_context import keyterms_for_session
+
+        keyterms = keyterms_for_session(session)
+        try:
+            provider = get_stt_provider()
+            text = provider.transcribe(audio_bytes, content_type, keyterms=keyterms)
+        except Exception as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response(
+            {
+                "text": (text or "").strip(),
+                "keyterms_used": len(keyterms),
+                "provider": provider.__class__.__name__,
+            }
+        )
 
     @action(detail=True, methods=["post"], url_path="speak")
     def speak(self, request, pk=None):
@@ -221,3 +307,115 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
             request=request,
         )
         return Response(VivaSessionSerializer(session).data)
+
+    @action(detail=True, methods=["post"], url_path="integrity")
+    def integrity(self, request, pk=None):
+        """Record a proctoring event; grace_expired terminates the viva without evaluation."""
+        from django.utils.dateparse import parse_datetime
+
+        from viva.models import VivaIntegrityEvent
+
+        session = self.get_object()
+        event_type = str(request.data.get("event_type") or "").strip()
+        valid = {choice.value for choice in VivaIntegrityEvent.EventType}
+        if event_type not in valid:
+            return Response(
+                {"detail": f"event_type must be one of: {', '.join(sorted(valid))}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        client_ts = request.data.get("client_ts")
+        parsed_ts = parse_datetime(str(client_ts)) if client_ts else None
+        metadata = request.data.get("metadata") if isinstance(request.data.get("metadata"), dict) else {}
+        event = VivaIntegrityEvent.objects.create(
+            session=session,
+            event_type=event_type,
+            client_ts=parsed_ts,
+            metadata=metadata,
+        )
+        org = Organization.objects.get(pk=self.get_organization_id())
+        log_audit(
+            org,
+            request.user,
+            f"viva.integrity.{event_type}",
+            "viva_session",
+            str(session.id),
+            request=request,
+            metadata={"event_id": str(event.id), **metadata},
+        )
+
+        if event_type in (VivaIntegrityEvent.EventType.GRACE_EXPIRED, VivaIntegrityEvent.EventType.CAMERA_DENIED):
+            if session.state not in (
+                VivaSession.State.COMPLETED,
+                VivaSession.State.REVIEW_REQUIRED,
+                VivaSession.State.FAILED,
+            ):
+                orchestrator = VivaOrchestrator(session, org)
+                orchestrator.terminate_integrity(reason=event_type, metadata=metadata)
+                session.refresh_from_db()
+
+        return Response(
+            {
+                "event_id": str(event.id),
+                "event_type": event_type,
+                "session": VivaSessionSerializer(session, context={"request": request}).data,
+            }
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="proctor-frames",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def proctor_frames(self, request, pk=None):
+        """Accept a monitoring snapshot for instructor review."""
+        from io import BytesIO
+
+        from django.utils import timezone
+
+        from common.storage import upload_fileobj
+        from viva.models import VivaIntegrityEvent, VivaProctorFrame
+
+        session = self.get_object()
+        if session.state != VivaSession.State.IN_PROGRESS:
+            return Response(
+                {"detail": "Snapshots are only accepted during an in-progress viva."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        upload = request.FILES.get("frame") or request.FILES.get("image") or request.FILES.get("file")
+        if not upload:
+            return Response({"detail": "frame image is required."}, status=status.HTTP_400_BAD_REQUEST)
+        content_type = (getattr(upload, "content_type", None) or "image/jpeg").split(";")[0].strip()
+        if content_type not in ("image/jpeg", "image/jpg", "image/png", "image/webp"):
+            return Response({"detail": "frame must be a JPEG, PNG, or WebP image."}, status=status.HTTP_400_BAD_REQUEST)
+        payload = upload.read()
+        if not payload:
+            return Response({"detail": "frame was empty."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(payload) > 400 * 1024:
+            return Response({"detail": "frame is too large."}, status=status.HTTP_400_BAD_REQUEST)
+
+        last = session.proctor_frames.order_by("-captured_at").first()
+        if last and last.captured_at and (timezone.now() - last.captured_at).total_seconds() < 12:
+            return Response({"detail": "Too many snapshots. Try again shortly."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        if session.proctor_frames.count() >= 90:
+            return Response({"detail": "Snapshot limit reached for this session."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+        key = f"proctor/{session.id}/{timezone.now().strftime('%Y%m%dT%H%M%S')}.jpg"
+        try:
+            upload_fileobj(BytesIO(payload), key, content_type=content_type)
+        except Exception as exc:
+            return Response({"detail": f"Could not store snapshot: {exc}"}, status=status.HTTP_502_BAD_GATEWAY)
+
+        frame = VivaProctorFrame.objects.create(
+            session=session,
+            storage_key=key,
+            content_type=content_type,
+            byte_size=len(payload),
+        )
+        VivaIntegrityEvent.objects.create(
+            session=session,
+            event_type=VivaIntegrityEvent.EventType.FRAME_UPLOADED,
+            metadata={"frame_id": str(frame.id), "byte_size": len(payload)},
+        )
+        return Response({"id": str(frame.id), "captured_at": frame.captured_at})
+

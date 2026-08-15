@@ -9,6 +9,7 @@ export type VivaPhase =
   | 'listening'
   | 'processing'
   | 'complete'
+  | 'terminated'
   | 'error'
 
 const phaseColors: Record<VivaPhase, { glow: string; ring: string; core: string }> = {
@@ -41,6 +42,11 @@ const phaseColors: Record<VivaPhase, { glow: string; ring: string; core: string 
     glow: 'bg-emerald-400/25',
     ring: 'from-emerald-300/40 via-teal-400/30 to-cyan-400/20',
     core: 'from-emerald-400 to-teal-600',
+  },
+  terminated: {
+    glow: 'bg-amber-400/25',
+    ring: 'from-amber-300/40 via-orange-400/25 to-slate-400/20',
+    core: 'from-amber-400 to-orange-600',
   },
   error: {
     glow: 'bg-rose-400/25',

@@ -5,6 +5,7 @@ from viva.conversation import (
     _follow_up_cap_reached,
     _is_duplicate,
     _normalize_live_payload,
+    _planned_is_repeat,
     _strip_excerpt_labels,
     _verify_quote,
 )
@@ -24,6 +25,36 @@ class ConversationHelperTests(TestCase):
         previous = ["What design choice did you make around the validation metrics?"]
         candidate = "How did you evaluate scalability under load?"
         self.assertFalse(_is_duplicate(candidate, previous))
+
+    def test_planned_is_repeat_flags_same_concept_and_chunk(self):
+        class _Planned:
+            concept = "ResNet-18 backbone"
+            metadata = {"source_chunk_id": "chunk-1"}
+
+        asked = [
+            {
+                "concept": "ResNet-18 backbone",
+                "source_chunk_id": "chunk-1",
+                "is_follow_up": False,
+                "text": "Walk me through ResNet-18.",
+            }
+        ]
+        self.assertTrue(_planned_is_repeat(_Planned(), asked, {"ResNet-18 backbone"}))
+
+        asked_follow = [
+            {
+                "concept": "ResNet-18 backbone",
+                "source_chunk_id": "chunk-1",
+                "is_follow_up": True,
+                "text": "Can you go deeper?",
+            }
+        ]
+
+        class _Other:
+            concept = "Adam optimizer"
+            metadata = {"source_chunk_id": "chunk-2"}
+
+        self.assertFalse(_planned_is_repeat(_Other(), asked_follow, set()))
 
     def test_strip_excerpt_labels(self):
         text = "Referring to Excerpt 2, explain the loop structure?"

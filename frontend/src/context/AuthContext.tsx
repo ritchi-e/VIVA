@@ -14,6 +14,7 @@ import {
   getStoredTokens,
   setOrganizationId,
   setStoredTokens,
+  type GoogleAuthPayload,
   type LoginPayload,
   type RegisterPayload,
 } from '@/lib/api'
@@ -31,6 +32,7 @@ interface AuthContextValue {
   isOrgAdmin: boolean
   login: (payload: LoginPayload) => Promise<void>
   register: (payload: RegisterPayload) => Promise<void>
+  loginWithGoogle: (payload: GoogleAuthPayload) => Promise<void>
   logout: () => void
   setActiveOrganization: (membership: Membership) => void
   refreshProfile: () => Promise<void>
@@ -114,6 +116,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applySession],
   )
 
+  const loginWithGoogle = useCallback(
+    async (payload: GoogleAuthPayload) => {
+      const { data } = await authApi.google(payload)
+      setStoredTokens(data.tokens)
+      applySession(
+        data.user,
+        data.memberships,
+        data.active_membership?.organization ?? null,
+      )
+    },
+    [applySession],
+  )
+
   const register = useCallback(
     async (payload: RegisterPayload) => {
       const { data } = await authApi.register(payload)
@@ -158,6 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isOrgAdmin: activeMembership ? isOrgAdminRole(activeMembership.role) : false,
       login,
       register,
+      loginWithGoogle,
       logout,
       setActiveOrganization,
       refreshProfile,
@@ -169,6 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       login,
       register,
+      loginWithGoogle,
       logout,
       setActiveOrganization,
       refreshProfile,

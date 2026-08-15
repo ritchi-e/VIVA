@@ -70,3 +70,60 @@ def process_completed_viva_task(self, session_id: str, organization_id: str):
         raise self.retry(exc=exc) from exc
 
     return {"status": "ok", "session_id": session_id}
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=20)
+def notify_integrity_termination_task(self, session_id: str, organization_id: str, reason: str):
+    """Email assignment instructors that a viva was stopped for integrity."""
+    from django.conf import settings
+    from django.core.mail import send_mail
+
+    from orgs.models import Membership, Organization
+    from viva.models import VivaSession
+
+    try:
+        session = VivaSession.objects.select_related(
+            "assignment", "assignment__created_by", "student", "assignment__course"
+        ).get(pk=session_id)
+        organization = Organization.objects.get(pk=organization_id)
+    except (VivaSession.DoesNotExist, Organization.DoesNotExist):
+        return {"status": "skipped", "reason": "missing", "session_id": session_id}
+
+    recipients = set()
+    created_by = session.assignment.created_by
+    if created_by and created_by.email:
+        recipients.add(created_by.email)
+    instructor_emails = Membership.objects.filter(
+        organization=organization,
+        is_active=True,
+        role__in=[Membership.Role.INSTRUCTOR, Membership.Role.ORGANIZATION_ADMIN],
+    ).values_list("user__email", flat=True)
+    recipients.update(email for email in instructor_emails if email)
+    recipients.discard(session.student.email)
+    if not recipients:
+        return {"status": "skipped", "reason": "no_recipients", "session_id": session_id}
+
+    reason_text = (
+        "the student left the exam window for more than 5 seconds"
+        if reason == "grace_expired"
+        else f"an integrity event ({reason})"
+    )
+    body = (
+        f"A viva was stopped for {session.student.full_name or session.student.email} "
+        f"on assignment “{session.assignment.title}” because {reason_text}.\n\n"
+        f"Session id: {session.id}\n"
+        f"Review the session in the instructor dashboard for the monitoring report.\n"
+    )
+    try:
+        send_mail(
+            f"Viva stopped: {session.assignment.title}",
+            body,
+            getattr(settings, "DEFAULT_FROM_EMAIL", None),
+            sorted(recipients),
+            fail_silently=True,
+        )
+    except Exception as exc:
+        logger.exception("Integrity email failed for session %s", session_id)
+        raise self.retry(exc=exc) from exc
+    return {"status": "ok", "session_id": session_id, "recipients": len(recipients)}
+

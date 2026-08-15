@@ -94,6 +94,8 @@ class RagQuestionPlannerTests(TestCase):
             self.assertTrue(planned.concept)
             self.assertNotRegex(planned.concept, r"Concept \d+")
             self.assertTrue(planned.metadata.get("rag_chunks"))
+            self.assertIn("quality", planned.metadata)
+            self.assertIn("grounded", planned.metadata["quality"])
             word_planned_question(planned, self.org)
             self.assertTrue(planned.wording)
             self.assertNotIn("Concept 1", planned.wording)

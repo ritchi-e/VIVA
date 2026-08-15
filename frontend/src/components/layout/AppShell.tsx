@@ -12,6 +12,8 @@ import {
   Shield,
   Users,
 } from 'lucide-react'
+import { LogoMark } from '@/components/brand/Logo'
+import wordmarkUrl from '@/assets/mokhik-wordmark.png'
 import { useAuth } from '@/context/AuthContext'
 import { cn } from '@/lib/utils'
 
@@ -71,12 +73,10 @@ export function AppShell({ variant }: { variant: 'instructor' | 'student' }) {
     <div className="min-h-screen lg:grid lg:grid-cols-[248px_1fr]">
       <aside className="border-r border-[var(--color-border)] bg-white/90 backdrop-blur-sm">
         <div className="flex h-16 items-center gap-2.5 border-b border-[var(--color-border)] px-5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-cyan-700 text-[11px] font-bold text-white shadow-sm">
-            AV
-          </span>
+          <LogoMark className="h-8" />
           <div>
-            <p className="font-display text-sm font-semibold tracking-tight text-slate-900">AI Viva</p>
-            <p className="text-[11px] text-slate-500">
+            <img src={wordmarkUrl} alt="Mokhik" className="h-[15px] w-auto" />
+            <p className="mt-0.5 text-[11px] text-slate-500">
               {variant === 'student' ? 'Student' : 'Instructor'}
             </p>
           </div>

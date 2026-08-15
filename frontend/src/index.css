@@ -9,23 +9,24 @@
   --color-border: #dbe3ea;
   --color-muted: #5b6b7c;
   --color-foreground: #0b1520;
-  --color-primary: #0f766e;
-  --color-primary-hover: #0d9488;
+  --color-primary: #076f65;
+  --color-primary-hover: #0a8a7c;
   --color-danger: #b42318;
   --color-success: #067647;
-  --color-accent: #0e7490;
+  --color-accent: #0ebe92;
 }
 
 @layer base {
   html {
     @apply antialiased;
+    scroll-behavior: smooth;
   }
 
   body {
     @apply bg-[var(--color-surface)] text-[var(--color-foreground)] font-sans;
     background-image:
-      radial-gradient(ellipse 80% 50% at 0% -10%, rgba(15, 118, 110, 0.08), transparent),
-      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(14, 116, 144, 0.06), transparent);
+      radial-gradient(ellipse 80% 50% at 0% -10%, rgba(7, 111, 101, 0.08), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(14, 190, 146, 0.07), transparent);
     min-height: 100dvh;
   }
 

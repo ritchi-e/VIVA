@@ -40,14 +40,16 @@ export function VivaSessionsPage() {
                 </Link>
                 <Badge
                   tone={
-                    session.state === 'COMPLETED'
-                      ? 'success'
-                      : session.state === 'FAILED'
-                        ? 'danger'
-                        : 'info'
+                    session.integrity_terminated
+                      ? 'warning'
+                      : session.state === 'COMPLETED'
+                        ? 'success'
+                        : session.state === 'FAILED'
+                          ? 'danger'
+                          : 'info'
                   }
                 >
-                  {session.state}
+                  {session.integrity_terminated ? 'Integrity stop' : session.state}
                 </Badge>
               </div>
             </CardBody>

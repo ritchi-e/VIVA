@@ -82,11 +82,18 @@ def _asked_questions(session: VivaSession) -> list[dict[str, Any]]:
     asked: list[dict[str, Any]] = []
     for question in session.questions.order_by("sequence"):
         provenance = question.provenance or {}
+        excerpt = provenance.get("excerpt") if isinstance(provenance.get("excerpt"), dict) else {}
         asked.append(
             {
                 "sequence": question.sequence,
                 "concept": provenance.get("concept") or "",
                 "text": question.question_text,
+                "source_chunk_id": str(
+                    excerpt.get("chunk_id")
+                    or provenance.get("source_chunk_id")
+                    or ""
+                ),
+                "is_follow_up": bool(provenance.get("is_follow_up") or provenance.get("mode") == "follow_up"),
             }
         )
     return asked
@@ -108,7 +115,22 @@ def _unused_planned(
     )
     if covered_concepts:
         items = [item for item in items if item.concept not in covered_concepts]
-    return items
+    asked_chunk_ids = {
+        str(
+            ((q.provenance or {}).get("excerpt") or {}).get("chunk_id")
+            or (q.provenance or {}).get("source_chunk_id")
+            or ""
+        )
+        for q in session.questions.all()
+    }
+    asked_chunk_ids.discard("")
+
+    def _chunk_id(item: PlannedQuestion) -> str:
+        return str((item.metadata or {}).get("source_chunk_id") or "")
+
+    unused_chunk = [item for item in items if _chunk_id(item) not in asked_chunk_ids]
+    reused_chunk = [item for item in items if _chunk_id(item) in asked_chunk_ids]
+    return unused_chunk + reused_chunk
 
 
 def _coverage_state(session: VivaSession) -> dict[str, Any]:
@@ -144,6 +166,29 @@ def _is_duplicate(candidate: str, previous: list[str], *, threshold: float = 0.5
         intersection = len(cand_tokens & prev_tokens)
         union = len(cand_tokens | prev_tokens)
         if union and intersection / union >= threshold:
+            return True
+    return False
+
+
+def _planned_is_repeat(
+    planned: PlannedQuestion | None,
+    asked: list[dict[str, Any]],
+    covered_concepts: set[str],
+) -> bool:
+    """True when an advance question reuses a concept or source chunk already asked."""
+    if not planned:
+        return False
+    concept = (planned.concept or "").strip()
+    if concept and concept in covered_concepts:
+        return True
+    chunk_id = str((planned.metadata or {}).get("source_chunk_id") or "")
+    concept_l = concept.lower()
+    for item in asked:
+        if item.get("is_follow_up"):
+            continue
+        if concept_l and (item.get("concept") or "").strip().lower() == concept_l:
+            return True
+        if chunk_id and item.get("source_chunk_id") == chunk_id:
             return True
     return False
 
@@ -729,9 +774,50 @@ def generate_next_turn(
         rag_chunks,
         fallback_quote=fallback_quote or "",
     )
+    if not (excerpt.get("quote") or "").strip():
+        grounded_fallback = _fallback_question(planned or focus, last_answer, chunks=rag_chunks)
+        question_text = grounded_fallback["question_text"]
+        excerpt = _build_excerpt(
+            grounded_fallback.get("excerpt_quote") or "",
+            grounded_fallback.get("excerpt_chunk_id") or "",
+            rag_chunks,
+            fallback_quote=fallback_quote or "",
+        )
 
     max_q = 1
     acknowledgment, question_text = _polish_turn(acknowledgment, question_text, max_questions=max_q)
+
+    def _swap_to_next_unused() -> bool:
+        nonlocal mode, planned, planned_id, rag_chunks, question_text, acknowledgment, excerpt
+        for alt in unused:
+            if alt is planned:
+                continue
+            if _planned_is_repeat(alt, asked, covered_concepts):
+                continue
+            alt_chunks = _chunks_from_planned(alt)[:4] or rag_chunks
+            alt_fallback = _fallback_question(alt, last_answer, chunks=alt_chunks)
+            alt_text = alt_fallback["question_text"]
+            if _is_duplicate(alt_text, prior_texts):
+                continue
+            mode = "advance"
+            planned = alt
+            planned_id = str(alt.id)
+            rag_chunks = alt_chunks
+            question_text = alt_text
+            acknowledgment = ""
+            excerpt = _build_excerpt(
+                alt_fallback.get("excerpt_quote") or "",
+                alt_fallback.get("excerpt_chunk_id") or "",
+                rag_chunks,
+                fallback_quote=(alt.metadata or {}).get("source_quote") or "",
+            )
+            acknowledgment, question_text = _polish_turn(acknowledgment, question_text, max_questions=1)
+            return True
+        return False
+
+    if mode == "advance" and _planned_is_repeat(planned, asked, covered_concepts):
+        logger.info("Repeated concept/chunk detected; advancing to next unused topic")
+        _swap_to_next_unused()
 
     if _is_duplicate(question_text, prior_texts):
         logger.info("Duplicate question detected; falling back to next topic")
@@ -750,25 +836,10 @@ def generate_next_turn(
                 fallback_quote=(planned.metadata or {}).get("source_quote") or "",
             )
             acknowledgment, question_text = _polish_turn(acknowledgment, question_text, max_questions=1)
+            if _is_duplicate(question_text, prior_texts) or _planned_is_repeat(planned, asked, covered_concepts):
+                _swap_to_next_unused()
         elif unused:
-            for alt in unused:
-                alt_chunks = _chunks_from_planned(alt)[:4] or rag_chunks
-                alt_fallback = _fallback_question(alt, last_answer, chunks=alt_chunks)
-                alt_text = alt_fallback["question_text"]
-                if not _is_duplicate(alt_text, prior_texts):
-                    planned = alt
-                    planned_id = str(alt.id)
-                    rag_chunks = alt_chunks
-                    question_text = alt_text
-                    acknowledgment = ""
-                    excerpt = _build_excerpt(
-                        alt_fallback.get("excerpt_quote") or "",
-                        alt_fallback.get("excerpt_chunk_id") or "",
-                        rag_chunks,
-                        fallback_quote=(alt.metadata or {}).get("source_quote") or "",
-                    )
-                    acknowledgment, question_text = _polish_turn(acknowledgment, question_text, max_questions=1)
-                    break
+            _swap_to_next_unused()
 
     spoken = _compose_spoken(acknowledgment, question_text)
     return {

@@ -1,7 +1,8 @@
 from rest_framework import serializers
 
 from accounts.models import User
-from orgs.models import Membership, Organization
+from accounts.services import provision_personal_workspace
+from orgs.models import Membership
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -34,15 +35,8 @@ class RegisterSerializer(serializers.Serializer):
             password=validated_data["password"],
             full_name=validated_data.get("full_name", ""),
         )
-        slug = org_name.lower().replace(" ", "-")[:40]
-        base_slug = slug
-        i = 1
-        while Organization.objects.filter(slug=slug).exists():
-            slug = f"{base_slug}-{i}"
-            i += 1
-        org = Organization.objects.create(name=org_name, slug=slug)
-        Membership.objects.create(organization=org, user=user, role=role)
-        user._created_organization = org
+        membership = provision_personal_workspace(user, role=role, organization_name=org_name)
+        user._created_organization = membership.organization
         user._created_role = role
         return user
 

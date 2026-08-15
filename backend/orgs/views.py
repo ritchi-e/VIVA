@@ -1,4 +1,9 @@
+from datetime import datetime, time, timedelta
+
 from django.db.models import Avg, Count, Q
+from django.db.models.functions import Coalesce, TruncDate, TruncWeek
+from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -99,6 +104,8 @@ def _org_id_or_400(request):
 
 
 def _serialize_recent_session(session: VivaSession) -> dict:
+    config = session.config if isinstance(session.config, dict) else {}
+    integrity = bool(config.get("integrity_termination"))
     return {
         "id": str(session.id),
         "state": session.state,
@@ -114,6 +121,7 @@ def _serialize_recent_session(session: VivaSession) -> dict:
         "started_at": session.started_at,
         "completed_at": session.completed_at,
         "created_at": session.created_at,
+        "integrity_terminated": integrity,
     }
 
 
@@ -129,6 +137,25 @@ class DashboardView(APIView):
         submissions = Submission.objects.filter(assignment__course__organization_id=org_id)
         sessions = VivaSession.objects.filter(assignment__course__organization_id=org_id)
         assessments = Assessment.objects.filter(submission__assignment__course__organization_id=org_id)
+
+        course_id = request.query_params.get("course")
+        assignment_id = request.query_params.get("assignment")
+        since_raw = request.query_params.get("since")
+        since_date = parse_date(str(since_raw)) if since_raw else None
+        if course_id:
+            assignments = assignments.filter(course_id=course_id)
+            submissions = submissions.filter(assignment__course_id=course_id)
+            sessions = sessions.filter(assignment__course_id=course_id)
+            assessments = assessments.filter(submission__assignment__course_id=course_id)
+        if assignment_id:
+            assignments = assignments.filter(pk=assignment_id)
+            submissions = submissions.filter(assignment_id=assignment_id)
+            sessions = sessions.filter(assignment_id=assignment_id)
+            assessments = assessments.filter(submission__assignment_id=assignment_id)
+        if since_date:
+            submissions = submissions.filter(created_at__date__gte=since_date)
+            sessions = sessions.filter(created_at__date__gte=since_date)
+            assessments = assessments.filter(created_at__date__gte=since_date)
 
         pending_review = assessments.filter(
             status__in=[Assessment.Status.PENDING_REVIEW, Assessment.Status.DRAFT, Assessment.Status.MODIFIED]
@@ -146,6 +173,128 @@ class DashboardView(APIView):
             sessions.select_related("student", "assignment", "submission")
             .order_by("-created_at")[:10]
         )
+
+        window_start = timezone.now() - timedelta(days=30)
+        if since_date:
+            since_dt = datetime.combine(since_date, time.min)
+            if timezone.is_aware(timezone.now()):
+                since_dt = timezone.make_aware(since_dt)
+            if since_dt > window_start:
+                window_start = since_dt
+
+        sessions_by_day = list(
+            sessions.filter(completed_at__gte=window_start)
+            .exclude(completed_at=None)
+            .annotate(day=TruncDate("completed_at"))
+            .values("day")
+            .annotate(
+                completed=Count("id", filter=Q(state=VivaSession.State.COMPLETED)),
+                failed=Count("id", filter=Q(state=VivaSession.State.FAILED)),
+                total=Count("id"),
+            )
+            .order_by("day")
+        )
+        scores_by_week = list(
+            assessments.exclude(overall_score__isnull=True)
+            .filter(created_at__gte=window_start)
+            .annotate(week=TruncWeek("created_at"))
+            .values("week")
+            .annotate(average=Avg("overall_score"), count=Count("id"))
+            .order_by("week")
+        )
+
+        score_values = list(
+            assessments.exclude(overall_score__isnull=True).values_list("overall_score", flat=True)
+        )
+        buckets = [
+            {"bucket": "0-20", "count": 0},
+            {"bucket": "20-40", "count": 0},
+            {"bucket": "40-60", "count": 0},
+            {"bucket": "60-80", "count": 0},
+            {"bucket": "80-100", "count": 0},
+        ]
+        for score in score_values:
+            value = float(score)
+            if value < 20:
+                buckets[0]["count"] += 1
+            elif value < 40:
+                buckets[1]["count"] += 1
+            elif value < 60:
+                buckets[2]["count"] += 1
+            elif value < 80:
+                buckets[3]["count"] += 1
+            else:
+                buckets[4]["count"] += 1
+
+        by_assignment = list(
+            sessions.values("assignment_id", "assignment__title")
+            .annotate(
+                total=Count("id"),
+                completed=Count("id", filter=Q(state=VivaSession.State.COMPLETED)),
+                failed=Count("id", filter=Q(state=VivaSession.State.FAILED)),
+            )
+            .order_by("-total")[:8]
+        )
+        assignment_series = [
+            {
+                "assignment_id": str(row["assignment_id"]),
+                "assignment_title": row["assignment__title"],
+                "total": row["total"],
+                "completed": row["completed"],
+                "failed": row["failed"],
+            }
+            for row in by_assignment
+        ]
+
+        from assessments.models import AssessmentCriterion
+
+        criterion_rows = (
+            AssessmentCriterion.objects.filter(assessment__in=assessments)
+            .annotate(score=Coalesce("final_score", "instructor_score", "ai_score"))
+            .exclude(score=None)
+            .values("name")
+            .annotate(average=Avg("score"), count=Count("id"))
+            .order_by("name")
+        )
+        criterion_averages = [
+            {"name": row["name"], "average": round(float(row["average"]), 2), "count": row["count"]}
+            for row in criterion_rows
+        ]
+
+        try:
+            integrity_terminations = sessions.filter(config__has_key="integrity_termination").count()
+        except Exception:
+            integrity_terminations = sum(
+                1
+                for cfg in sessions.values_list("config", flat=True)
+                if isinstance(cfg, dict) and cfg.get("integrity_termination")
+            )
+
+        completions_series = [
+            {
+                "date": row["day"].isoformat() if row["day"] else None,
+                "completed": row["completed"],
+                "failed": row["failed"],
+                "total": row["total"],
+            }
+            for row in sessions_by_day
+        ]
+        weekly_scores = []
+        for row in scores_by_week:
+            week = row["week"]
+            if week is None:
+                week_iso = None
+            elif hasattr(week, "date"):
+                week_iso = week.date().isoformat()
+            else:
+                week_iso = week.isoformat()
+            weekly_scores.append(
+                {
+                    "week": week_iso,
+                    "average": round(float(row["average"]), 2) if row["average"] is not None else None,
+                    "count": row["count"],
+                }
+            )
 
         return Response(
             {
@@ -167,12 +316,19 @@ class DashboardView(APIView):
                     "completed": sessions.filter(state=VivaSession.State.COMPLETED).count(),
                     "in_progress": sessions.filter(state=VivaSession.State.IN_PROGRESS).count(),
                     "failed": sessions.filter(state=VivaSession.State.FAILED).count(),
+                    "integrity_terminated": integrity_terminations,
                     "total": sessions.count(),
                 },
                 "average_assessment": round(float(avg), 2) if avg is not None else None,
                 "assessment_distribution": list(distribution),
                 "students_requiring_review": pending_review,
                 "recent_sessions": [_serialize_recent_session(s) for s in recent_sessions_qs],
+                "sessions_by_day": completions_series,
+                "scores_by_week": weekly_scores,
+                "score_buckets": buckets,
+                "by_assignment": assignment_series,
+                "criterion_averages": criterion_averages,
+                "integrity_terminations": integrity_terminations,
             }
         )
 

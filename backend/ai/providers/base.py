@@ -52,7 +52,13 @@ class EmbeddingProvider(ABC):
 
 class STTProvider(ABC):
     @abstractmethod
-    def transcribe(self, audio_bytes: bytes, content_type: str = "audio/wav") -> str:
+    def transcribe(
+        self,
+        audio_bytes: bytes,
+        content_type: str = "audio/wav",
+        *,
+        keyterms: list[str] | None = None,
+    ) -> str:
         raise NotImplementedError
 
 

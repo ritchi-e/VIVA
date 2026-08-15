@@ -13,6 +13,20 @@ import {
   waitUntilSpeechIdle,
   type ExaminerVoiceChoice,
 } from '@/lib/browserTts'
+import {
+  micCaptureSupported,
+  startVoiceSession,
+  transcribeSessionAudio,
+  type VoiceSession,
+} from '@/lib/deepgramStt'
+import {
+  INTEGRITY_GRACE_MS,
+  PROCTOR_FRAME_INTERVAL_MS,
+  reportIntegrityEvent,
+  startCameraMonitor,
+  uploadProctorFrame,
+  type CameraMonitor,
+} from '@/lib/proctoring'
 import { enterFullscreen, exitFullscreen } from '@/lib/fullscreen'
 import type { VivaExcerpt, VivaWsMessage } from '@/types'
 import { VivaOrb, phaseCopy, useRotatingDetail, type VivaPhase } from '@/components/viva/VivaOrb'
@@ -72,6 +86,8 @@ export function VivaInterface({
   const [connected, setConnected] = useState(false)
   const [audioStarted, setAudioStarted] = useState(initialComplete)
   const [finishing, setFinishing] = useState(false)
+  const [awaySeconds, setAwaySeconds] = useState<number | null>(null)
+  const [monitoringOn, setMonitoringOn] = useState(false)
   const [selectedVoice, setSelectedVoice] = useState<ExaminerVoiceChoice>('siya')
   const [previewingVoice, setPreviewingVoice] = useState<ExaminerVoiceChoice | null>(null)
   const selectedVoiceRef = useRef<ExaminerVoiceChoice>('siya')
@@ -82,14 +98,14 @@ export function VivaInterface({
   const questionTextRef = useRef(initialQuestionText ?? '')
   const phaseRef = useRef(phase)
   const wsRef = useRef<WebSocket | null>(null)
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const voiceSessionRef = useRef<VoiceSession | null>(null)
+  const finishingListenRef = useRef(false)
   const reconnectTimer = useRef<number | null>(null)
   const shouldReconnect = useRef(true)
   const completeRef = useRef(initialComplete)
   const lastHandledQuestionRef = useRef<string | null>(null)
   const submittingRef = useRef(false)
   const listenTimersRef = useRef<{ silence?: number; max?: number }>({})
-  const transcriptPartsRef = useRef<string[]>([])
   const lastSpeechAtRef = useRef(0)
   const hadSpeechRef = useRef(false)
   const pendingQuestionRef = useRef<PendingQuestion | null>(
@@ -106,16 +122,18 @@ export function VivaInterface({
   const intentionalCloseRef = useRef(false)
   const questionFlowRef = useRef<{ id: string | null; inFlight: boolean }>({ id: null, inFlight: false })
   const listenStartedAtRef = useRef(0)
+  const cameraRef = useRef<CameraMonitor | null>(null)
+  const frameTimerRef = useRef<number | null>(null)
+  const graceTimerRef = useRef<number | null>(null)
+  const graceTickRef = useRef<number | null>(null)
+  const monitorEnabledRef = useRef(false)
+  const watchFullscreenRef = useRef(false)
+  const terminatingRef = useRef(false)
 
   phaseRef.current = phase
   audioStartedRef.current = audioStarted
 
-  const speechSupported = useMemo(
-    () =>
-      typeof window !== 'undefined' &&
-      ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window),
-    [],
-  )
+  const micSupported = useMemo(() => micCaptureSupported(), [])
 
   const ttsSupported = true
 
@@ -131,13 +149,53 @@ export function VivaInterface({
 
   const stopListening = useCallback(() => {
     clearListenTimers()
-    try {
-      recognitionRef.current?.stop()
-    } catch {
-      /* ignore */
-    }
-    recognitionRef.current = null
+    finishingListenRef.current = true
+    const session = voiceSessionRef.current
+    voiceSessionRef.current = null
+    session?.destroy()
   }, [clearListenTimers])
+
+  const stopMonitoring = useCallback(() => {
+    monitorEnabledRef.current = false
+    setMonitoringOn(false)
+    setAwaySeconds(null)
+    if (graceTimerRef.current) {
+      window.clearTimeout(graceTimerRef.current)
+      graceTimerRef.current = null
+    }
+    if (graceTickRef.current) {
+      window.clearInterval(graceTickRef.current)
+      graceTickRef.current = null
+    }
+    if (frameTimerRef.current) {
+      window.clearInterval(frameTimerRef.current)
+      frameTimerRef.current = null
+    }
+    cameraRef.current?.stop()
+    cameraRef.current = null
+  }, [])
+
+  const terminateIntegrity = useCallback(
+    async (eventType: 'grace_expired' | 'camera_denied', metadata?: Record<string, unknown>) => {
+      if (terminatingRef.current || completeRef.current) return
+      terminatingRef.current = true
+      completeRef.current = true
+      shouldReconnect.current = false
+      stopListening()
+      stopAudio()
+      stopMonitoring()
+      try {
+        await reportIntegrityEvent(sessionId, eventType, metadata)
+      } catch {
+        /* session may already be failed */
+      }
+      intentionalCloseRef.current = true
+      wsRef.current?.close()
+      setPhase('terminated')
+      void exitFullscreen()
+    },
+    [sessionId, stopAudio, stopListening, stopMonitoring],
+  )
 
   const submitAnswer = useCallback(
     async (text: string) => {
@@ -178,91 +236,76 @@ export function VivaInterface({
     [sessionId, stopAudio, stopListening],
   )
 
-  const finishListening = useCallback(() => {
-    if (phaseRef.current !== 'listening') return
-    const text = transcriptPartsRef.current.join(' ').trim()
+  const finishListening = useCallback(async () => {
+    if (phaseRef.current !== 'listening' || finishingListenRef.current) return
     const elapsed = Date.now() - listenStartedAtRef.current
-    if (!text && elapsed < MIN_LISTEN_MS) return
-    stopListening()
-    void submitAnswer(text)
-  }, [stopListening, submitAnswer])
+    if (!hadSpeechRef.current && elapsed < MIN_LISTEN_MS) return
+
+    finishingListenRef.current = true
+    clearListenTimers()
+    setPhase('processing')
+    setLiveTranscript('Transcribing your answer…')
+
+    const session = voiceSessionRef.current
+    voiceSessionRef.current = null
+
+    try {
+      const blob = session ? await session.stop() : null
+      if (!blob || blob.size < 256) {
+        await submitAnswer('')
+        return
+      }
+      const text = await transcribeSessionAudio(sessionId, blob)
+      setLiveTranscript(text)
+      await submitAnswer(text)
+    } catch (err) {
+      session?.destroy()
+      submittingRef.current = false
+      setError(err instanceof Error ? err.message : 'Could not transcribe your answer')
+      setPhase('error')
+    }
+  }, [clearListenTimers, sessionId, submitAnswer])
 
   const startListening = useCallback(async () => {
-    if (!speechSupported || completeRef.current) {
-      setError('Speech recognition is not available in this browser.')
+    if (!micSupported || completeRef.current) {
+      setError('Microphone access is required for this viva. Allow mic permissions and try again.')
       setPhase('error')
       return
     }
 
     await new Promise((r) => window.setTimeout(r, POST_SPEECH_DELAY_MS))
 
-    transcriptPartsRef.current = []
+    finishingListenRef.current = false
     hadSpeechRef.current = false
     lastSpeechAtRef.current = Date.now()
     listenStartedAtRef.current = Date.now()
-    setLiveTranscript('')
+    setLiveTranscript('Listening…')
     setPhase('listening')
 
     try {
-      const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition
-      const recognition = new SpeechRecognitionCtor()
-      recognition.continuous = true
-      recognition.interimResults = true
-      recognition.lang = 'en-US'
-
-      recognition.onresult = (event) => {
-        let interim = ''
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const part = event.results[i][0].transcript
-          if (event.results[i].isFinal) {
-            transcriptPartsRef.current.push(part)
-            hadSpeechRef.current = true
-            lastSpeechAtRef.current = Date.now()
-          } else {
-            interim += part
-          }
-        }
-        const combined = [...transcriptPartsRef.current, interim].join(' ').trim()
-        setLiveTranscript(combined)
-      }
-
-      recognition.onerror = () => {
-        if (Date.now() - listenStartedAtRef.current < MIN_LISTEN_MS) return
-        finishListening()
-      }
-
-      recognition.onend = () => {
-        if (phaseRef.current !== 'listening') return
-        const elapsed = Date.now() - listenStartedAtRef.current
-        if (!hadSpeechRef.current && elapsed < MIN_LISTEN_MS) {
-          try {
-            recognition.start()
-          } catch {
-            /* recognition may already be running */
-          }
-          return
-        }
-        finishListening()
-      }
-
-      recognitionRef.current = recognition
-      recognition.start()
+      const session = await startVoiceSession((active) => {
+        if (!active || finishingListenRef.current) return
+        hadSpeechRef.current = true
+        lastSpeechAtRef.current = Date.now()
+        setLiveTranscript((prev) => (prev ? prev : 'Listening…'))
+      })
+      voiceSessionRef.current = session
 
       listenTimersRef.current.silence = window.setInterval(() => {
-        if (!hadSpeechRef.current) return
+        if (finishingListenRef.current || !hadSpeechRef.current) return
         if (Date.now() - lastSpeechAtRef.current >= SILENCE_MS) {
-          finishListening()
+          void finishListening()
         }
       }, 250)
 
       listenTimersRef.current.max = window.setTimeout(() => {
-        finishListening()
+        void finishListening()
       }, MAX_LISTEN_MS)
     } catch {
       setError('Could not start microphone. Check browser permissions.')
       setPhase('error')
     }
-  }, [finishListening, speechSupported])
+  }, [finishListening, micSupported])
 
   const handleNewQuestion = useCallback(
     async (q: PendingQuestion) => {
@@ -333,12 +376,41 @@ export function VivaInterface({
     setError(null)
     selectedVoiceRef.current = selectedVoice
     setExaminerVoiceChoice(selectedVoice, sessionId)
-    void enterFullscreen(containerRef.current ?? document.documentElement)
+    const fullscreenOk = await enterFullscreen(containerRef.current ?? document.documentElement)
+    watchFullscreenRef.current = fullscreenOk
     try {
       await primeSpeechSynthesis()
     } catch {
       /* continue even if prime fails */
     }
+
+    try {
+      const camera = await startCameraMonitor()
+      cameraRef.current = camera
+      frameTimerRef.current = window.setInterval(() => {
+        const monitor = cameraRef.current
+        if (!monitor || completeRef.current) return
+        void monitor.captureJpeg().then((blob) => {
+          if (!blob || blob.size < 400) return
+          void uploadProctorFrame(sessionId, blob).catch(() => undefined)
+        })
+      }, PROCTOR_FRAME_INTERVAL_MS)
+      window.setTimeout(() => {
+        const monitor = cameraRef.current
+        if (!monitor) return
+        void monitor.captureJpeg().then((blob) => {
+          if (!blob || blob.size < 400) return
+          void uploadProctorFrame(sessionId, blob).catch(() => undefined)
+        })
+      }, 1500)
+    } catch {
+      await terminateIntegrity('camera_denied')
+      setError('Camera access is required. Allow the camera and restart the viva.')
+      return
+    }
+
+    monitorEnabledRef.current = true
+    setMonitoringOn(true)
     setAudioStarted(true)
 
     const pending = pendingQuestionRef.current
@@ -348,7 +420,64 @@ export function VivaInterface({
     } else if (phaseRef.current === 'connecting' || phaseRef.current === 'preparing') {
       setPhase(connected ? 'preparing' : 'connecting')
     }
-  }, [connected, handleNewQuestion, selectedVoice, sessionId])
+  }, [connected, handleNewQuestion, selectedVoice, sessionId, terminateIntegrity])
+
+  useEffect(() => {
+    const isAway = () => {
+      if (document.hidden) return true
+      if (watchFullscreenRef.current && !document.fullscreenElement) return true
+      return false
+    }
+
+    const clearGrace = () => {
+      if (graceTimerRef.current) {
+        window.clearTimeout(graceTimerRef.current)
+        graceTimerRef.current = null
+      }
+      if (graceTickRef.current) {
+        window.clearInterval(graceTickRef.current)
+        graceTickRef.current = null
+      }
+      setAwaySeconds(null)
+    }
+
+    const onLeave = () => {
+      if (!monitorEnabledRef.current || completeRef.current || terminatingRef.current) return
+      if (graceTimerRef.current) return
+      void reportIntegrityEvent(sessionId, document.hidden ? 'tab_hidden' : 'fullscreen_left').catch(
+        () => undefined,
+      )
+      const started = Date.now()
+      setAwaySeconds(Math.ceil(INTEGRITY_GRACE_MS / 1000))
+      graceTickRef.current = window.setInterval(() => {
+        const left = Math.max(0, Math.ceil((INTEGRITY_GRACE_MS - (Date.now() - started)) / 1000))
+        setAwaySeconds(left)
+      }, 200)
+      graceTimerRef.current = window.setTimeout(() => {
+        void terminateIntegrity('grace_expired', { hidden_ms: Date.now() - started })
+      }, INTEGRITY_GRACE_MS)
+    }
+
+    const onReturn = () => {
+      if (!monitorEnabledRef.current || completeRef.current) return
+      if (!graceTimerRef.current) return
+      clearGrace()
+      void reportIntegrityEvent(sessionId, 'tab_returned').catch(() => undefined)
+    }
+
+    const onChange = () => {
+      if (isAway()) onLeave()
+      else onReturn()
+    }
+
+    document.addEventListener('visibilitychange', onChange)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => {
+      document.removeEventListener('visibilitychange', onChange)
+      document.removeEventListener('fullscreenchange', onChange)
+      clearGrace()
+    }
+  }, [sessionId, terminateIntegrity])
 
   const finishViva = useCallback(async () => {
     if (completeRef.current || finishing) return
@@ -362,11 +491,32 @@ export function VivaInterface({
 
     setFinishing(true)
     shouldReconnect.current = false
-    stopListening()
+    finishingListenRef.current = true
+    clearListenTimers()
     stopAudio()
+    stopMonitoring()
     await waitUntilSpeechIdle()
 
-    const pendingText = [...transcriptPartsRef.current, liveTranscript].join(' ').trim()
+    let pendingText = ''
+    const voice = voiceSessionRef.current
+    voiceSessionRef.current = null
+    if (voice) {
+      try {
+        const blob = await voice.stop()
+        if (blob && blob.size >= 256) {
+          pendingText = await transcribeSessionAudio(sessionId, blob)
+        }
+      } catch {
+        voice.destroy()
+      }
+    } else if (
+      liveTranscript &&
+      !liveTranscript.startsWith('Listening') &&
+      !liveTranscript.startsWith('Transcribing')
+    ) {
+      pendingText = liveTranscript.trim()
+    }
+
     const questionId = questionIdRef.current
 
     try {
@@ -400,7 +550,7 @@ export function VivaInterface({
     } finally {
       setFinishing(false)
     }
-  }, [finishing, liveTranscript, sessionId, stopAudio, stopListening])
+  }, [clearListenTimers, finishing, liveTranscript, sessionId, stopAudio, stopMonitoring])
 
   const handleAnswerResultRef = useRef<(data: AnswerResultMsg) => void>(() => undefined)
 
@@ -547,11 +697,12 @@ export function VivaInterface({
       stopListening()
       stopAudio()
       stopExaminerSpeech()
+      stopMonitoring()
       // Do not resetExaminerVoice() here — this effect also re-runs on reconnect
       // dependency churn and would drop the locked Noah/Siya mid-viva.
       void exitFullscreen()
     }
-  }, [sessionId, connect, queueQuestion, stopListening, stopAudio, initialComplete])
+  }, [sessionId, connect, queueQuestion, stopListening, stopAudio, stopMonitoring, initialComplete])
 
   useEffect(() => {
     return () => {
@@ -566,7 +717,8 @@ export function VivaInterface({
         ? Math.min(100, Math.round((sequence / questionBudget) * 100))
         : 0
 
-  const showBeginButton = !initialComplete && !audioStarted && phase !== 'complete'
+  const showBeginButton =
+    !initialComplete && !audioStarted && phase !== 'complete' && phase !== 'terminated'
   const immersive = !initialComplete
   const blockCopy = immersive && phase !== 'complete'
   const activePhase = showBeginButton ? 'connecting' : phase
@@ -582,7 +734,7 @@ export function VivaInterface({
   const statusDetail = finishing
     ? PLATFORM_PROGRESS.finishingViva.detail
     : showBeginButton
-      ? 'Choose a voice, then begin. The viva opens fullscreen so you can focus.'
+      ? 'Choose a voice, then begin. This viva is live-monitored. Stay in this window; leaving for more than 5 seconds ends the session and notifies your instructor. Camera access is required.'
       : rotating ?? copy.detail
 
   const preventCopy = useCallback((event: ClipboardEvent | MouseEvent | DragEvent) => {
@@ -612,9 +764,23 @@ export function VivaInterface({
       </div>
 
       <div className="relative z-10 flex min-h-dvh flex-col items-center px-4 py-8 sm:px-8">
+        {awaySeconds != null && phase !== 'terminated' ? (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 px-6">
+            <div className="max-w-md rounded-3xl border border-amber-200/30 bg-[#1a140c] p-8 text-center shadow-2xl">
+              <p className="font-display text-2xl font-semibold text-amber-50">Return to the viva</p>
+              <p className="mt-3 text-sm leading-relaxed text-amber-100/70">
+                Stay in this window. If you do not return in {awaySeconds} second
+                {awaySeconds === 1 ? '' : 's'}, the session ends and your instructor is notified.
+              </p>
+              <p className="mt-5 font-display text-5xl font-semibold tabular-nums text-amber-200">
+                {awaySeconds}
+              </p>
+            </div>
+          </div>
+        ) : null}
         <div className="mb-8 flex w-full max-w-xl items-center justify-between">
-          <p className="font-display text-sm font-semibold tracking-tight text-white/80">AI Viva</p>
-          {audioStarted && !showBeginButton && phase !== 'complete' ? (
+          <p className="font-display text-sm font-semibold tracking-tight text-white/80">Mokhik</p>
+          {audioStarted && !showBeginButton && phase !== 'complete' && phase !== 'terminated' ? (
             <button
               type="button"
               disabled={finishing}
@@ -645,6 +811,12 @@ export function VivaInterface({
         </div>
 
         <VivaOrb phase={activePhase} />
+
+        {monitoringOn && phase !== 'terminated' && phase !== 'complete' ? (
+          <p className="mt-4 rounded-full border border-teal-400/25 bg-teal-500/10 px-4 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-teal-100/80">
+            Live monitoring on
+          </p>
+        ) : null}
 
         <div className="mt-7 max-w-lg text-center animate-viva-fade-up" key={statusTitle}>
           <p className="font-display text-xl font-semibold tracking-tight text-white sm:text-2xl">
@@ -701,6 +873,10 @@ export function VivaInterface({
                 {previewingVoice === selectedVoice ? 'Playing a short sample…' : 'Preview voice'}
               </button>
             </div>
+            <div className="rounded-2xl border border-amber-200/20 bg-amber-500/10 px-4 py-3 text-left text-xs leading-relaxed text-amber-50/85">
+              This viva is live-monitored. Stay in this window. If you leave for more than 5 seconds,
+              the session ends and your instructor is notified. Camera access is required.
+            </div>
             <button
               type="button"
               onClick={() => void beginSession()}
@@ -753,13 +929,28 @@ export function VivaInterface({
           </div>
         ) : null}
 
+        {phase === 'terminated' ? (
+          <div className="mt-8 max-w-md text-center animate-viva-fade-up">
+            <p className="text-sm leading-relaxed text-amber-100/80">
+              The viva was stopped because you left the exam window. Your instructor has received a
+              report. You cannot continue this session.
+            </p>
+            <Link
+              to="/student/dashboard"
+              className="mt-5 inline-block rounded-full border border-white/15 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white/80 hover:bg-white/15"
+            >
+              Back to dashboard
+            </Link>
+          </div>
+        ) : null}
+
         {error ? (
           <p className="mt-6 max-w-md text-center text-sm text-rose-300">{error}</p>
         ) : null}
 
-        {!speechSupported && phase !== 'complete' ? (
+        {!micSupported && phase !== 'complete' ? (
           <p className="mt-4 max-w-md text-center text-xs text-amber-100/70">
-            This viva works best in Chrome or Edge with speech recognition enabled.
+            Microphone access is required. Use Chrome or Edge and allow the mic when prompted.
           </p>
         ) : null}
 

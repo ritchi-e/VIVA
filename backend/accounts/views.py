@@ -144,19 +144,99 @@ class PasswordResetConfirmView(APIView):
         return Response({"message": "Password updated"})
 
 
-class GoogleOAuthStubView(APIView):
+class GoogleOAuthView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         from django.conf import settings
 
+        from accounts.services import provision_personal_workspace
+
         if not settings.GOOGLE_OAUTH_CLIENT_ID:
             return Response(
                 {
-                    "message": "Google OAuth is not configured. Set GOOGLE_OAUTH_CLIENT_ID/SECRET to enable.",
+                    "message": "Google OAuth is not configured. Set GOOGLE_OAUTH_CLIENT_ID to enable.",
                     "configured": False,
                 },
                 status=status.HTTP_501_NOT_IMPLEMENTED,
             )
-        return Response({"message": "OAuth exchange not yet enabled in this environment", "configured": True})
+
+        credential = (request.data.get("credential") or request.data.get("id_token") or "").strip()
+        if not credential:
+            return Response({"message": "credential is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        role = str(request.data.get("role") or Membership.Role.STUDENT).strip().lower()
+        if role not in (Membership.Role.STUDENT, Membership.Role.INSTRUCTOR):
+            role = Membership.Role.STUDENT
+
+        try:
+            from accounts.google import verify_google_id_token
+
+            idinfo = verify_google_id_token(credential, settings.GOOGLE_OAUTH_CLIENT_ID)
+        except ImportError:
+            return Response(
+                {"message": "Google auth library is not installed on the server."},
+                status=status.HTTP_501_NOT_IMPLEMENTED,
+            )
+        except Exception:
+            return Response({"message": "Invalid Google credential"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        email = str(idinfo.get("email") or "").lower().strip()
+        if not email or not idinfo.get("email_verified", True):
+            return Response({"message": "Google account email is not available"}, status=status.HTTP_400_BAD_REQUEST)
+
+        full_name = str(idinfo.get("name") or "").strip()
+        avatar = str(idinfo.get("picture") or "").strip()
+        created = False
+        user = User.objects.filter(email__iexact=email).first()
+        if user is None:
+            user = User.objects.create_user(
+                email=email,
+                password=None,
+                full_name=full_name,
+                email_verified=True,
+                avatar_url=avatar[:200] if avatar else "",
+            )
+            user.set_unusable_password()
+            user.save(update_fields=["password"])
+            created = True
+        else:
+            updates = []
+            if not user.email_verified:
+                user.email_verified = True
+                updates.append("email_verified")
+            if full_name and not user.full_name:
+                user.full_name = full_name
+                updates.append("full_name")
+            if avatar and not user.avatar_url:
+                user.avatar_url = avatar[:200]
+                updates.append("avatar_url")
+            if updates:
+                user.save(update_fields=[*updates, "updated_at"] if hasattr(user, "updated_at") else updates)
+
+        memberships = list(
+            Membership.objects.filter(user=user, is_active=True).select_related("organization")
+        )
+        if not memberships:
+            membership = provision_personal_workspace(user, role=role)
+            memberships = [membership]
+            created = True
+        membership = memberships[0]
+        payload = {
+            "user": UserSerializer(user).data,
+            "tokens": tokens_for_user(user),
+            "memberships": MembershipSerializer(memberships, many=True).data,
+            "active_membership": MembershipSerializer(membership).data,
+            "created": created,
+        }
+        log_audit(
+            membership.organization,
+            user,
+            "auth.google" if not created else "auth.google.register",
+            "user",
+            str(user.id),
+            request=request,
+        )
+        return Response(payload, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)

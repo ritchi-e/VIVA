@@ -6,6 +6,7 @@ from ai.service import AIService
 from assignments.models import LearningOutcome
 from orgs.models import Organization
 from questions.models import PlannedQuestion, QuestionPlan
+from questions.quality import diversify_plan_items, is_grounded_item, score_planned_question
 from rag.context import (
     build_concept_query,
     build_planning_query,
@@ -261,15 +262,10 @@ def plan_questions(
             "Check the AI provider response and try preparing the viva again."
         )
 
-    plan = QuestionPlan.objects.create(
-        submission=submission,
-        viva_session=viva_session,
-        plan=plan_data,
-        coverage=plan_data.get("coverage", {}) or {},
-        status="ready",
-    )
-
-    for idx, question in enumerate(questions[:budget]):
+    prepared_items: list[dict] = []
+    for question in questions:
+        if not isinstance(question, dict):
+            continue
         qtype = question.get("question_type", PlannedQuestion.QuestionType.CONCEPTUAL)
         valid = {choice.value for choice in PlannedQuestion.QuestionType}
         if qtype not in valid:
@@ -278,8 +274,8 @@ def plan_questions(
         concept = question.get("concept", "").strip()
         purpose = question.get("purpose", "").strip()
         source_quote = (question.get("source_quote") or "").strip()
-        chunk_id = question.get("source_chunk_id") or question.get("source_ref") or ""
-        # Drop quotes that were not actually taken from retrieved submission text.
+        chunk_id = str(question.get("source_chunk_id") or question.get("source_ref") or "")
+
         corpus = "\n".join(chunk.get("content") or "" for chunk in rag_chunks)
         if source_quote and source_quote[:48] not in corpus:
             matched_chunk = next(
@@ -291,29 +287,84 @@ def plan_questions(
                 None,
             )
             if matched_chunk:
-                chunk_id = matched_chunk.get("chunk_id") or chunk_id
+                chunk_id = str(matched_chunk.get("chunk_id") or chunk_id)
             else:
                 source_quote = ""
                 CITATION_VALIDATION.labels(result="invalid_quote").inc()
-        else:
-            CITATION_VALIDATION.labels(result="valid").inc()
-        if qtype == PlannedQuestion.QuestionType.IMPLEMENTATION and not source_quote and not chunk_id:
-            CITATION_VALIDATION.labels(result="missing_implementation_citation").inc()
+
         concept_chunks = _chunks_for_planned_item(
             submission,
             organization,
             concept=concept,
             purpose=purpose,
             question_type=qtype,
-            source_chunk_id=str(chunk_id),
+            source_chunk_id=chunk_id,
             source_quote=source_quote,
             fallback_chunks=rag_chunks,
+        )
+        if not chunk_id and concept_chunks:
+            chunk_id = str(concept_chunks[0].get("chunk_id") or "")
+        if not source_quote and concept_chunks:
+            source_quote = _snippet(concept_chunks[0].get("content") or "", 160)
+
+        grounded, reason = is_grounded_item(
+            question_type=qtype,
+            source_quote=source_quote,
+            source_chunk_id=chunk_id,
+            chunks=concept_chunks or rag_chunks,
+            concept=concept,
+            purpose=purpose,
+        )
+        CITATION_VALIDATION.labels(result=reason).inc()
+        prepared_items.append(
+            {
+                **question,
+                "question_type": qtype,
+                "concept": concept,
+                "purpose": purpose,
+                "source_quote": source_quote,
+                "source_chunk_id": chunk_id,
+                "_chunks": concept_chunks,
+                "_grounded": grounded,
+                "_grounding_reason": reason,
+            }
+        )
+
+    selected = diversify_plan_items(prepared_items, budget=budget)
+    if not selected:
+        raise ValueError(
+            "Question planning returned no grounded questions. "
+            "Check the AI provider response and try preparing the viva again."
+        )
+
+    plan = QuestionPlan.objects.create(
+        submission=submission,
+        viva_session=viva_session,
+        plan=plan_data,
+        coverage=plan_data.get("coverage", {}) or {},
+        status="ready",
+    )
+
+    selected_concepts = [str(item.get("concept") or "") for item in selected]
+    for idx, question in enumerate(selected):
+        concept = question.get("concept", "")
+        purpose = question.get("purpose", "")
+        source_quote = question.get("source_quote", "")
+        chunk_id = question.get("source_chunk_id") or ""
+        concept_chunks = question.get("_chunks") or []
+        others = [c for i, c in enumerate(selected_concepts) if i != idx]
+        quality = score_planned_question(
+            concept=concept,
+            purpose=purpose,
+            source_quote=source_quote,
+            chunks=concept_chunks or rag_chunks,
+            other_concepts=others,
         )
 
         PlannedQuestion.objects.create(
             plan=plan,
             order=idx,
-            question_type=qtype,
+            question_type=question.get("question_type", PlannedQuestion.QuestionType.CONCEPTUAL),
             difficulty=question.get("difficulty", "medium"),
             concept=concept,
             purpose=purpose,
@@ -329,6 +380,8 @@ def plan_questions(
                 "rag_chunks": concept_chunks,
                 "rag_chunk_ids": _chunk_ids(concept_chunks),
                 "source_chunk_id": chunk_id or (concept_chunks[0].get("chunk_id") if concept_chunks else None),
+                "quality": quality,
+                "grounding_reason": question.get("_grounding_reason") or "valid",
             },
         )
 

@@ -39,6 +39,20 @@ def get_embedding_provider() -> EmbeddingProvider:
 
 
 def get_stt_provider() -> STTProvider:
+    explicit = (getattr(settings, "STT_PROVIDER", "") or "").lower().strip()
+    deepgram_key = (getattr(settings, "DEEPGRAM_API_KEY", "") or "").strip()
+
+    use_deepgram = explicit == "deepgram" or (explicit in ("", "auto") and bool(deepgram_key))
+    if use_deepgram:
+        if not deepgram_key:
+            raise RuntimeError("STT_PROVIDER=deepgram but DEEPGRAM_API_KEY is not set")
+        from ai.providers.deepgram_provider import DeepgramSTTProvider
+
+        return DeepgramSTTProvider()
+
+    if explicit == "mock":
+        return MockSTTProvider()
+
     return MockSTTProvider()
 
 

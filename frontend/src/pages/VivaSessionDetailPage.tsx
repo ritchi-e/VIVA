@@ -54,10 +54,63 @@ export function VivaSessionDetailPage() {
           <p>Time limit: {Math.round(s.time_limit_seconds / 60)} min</p>
           <p>
             State: <Badge>{s.state}</Badge>
+            {s.integrity_terminated ? (
+              <Badge tone="warning" className="ml-2">
+                Integrity stop
+              </Badge>
+            ) : null}
           </p>
           {s.error_message ? <p className="text-red-600 sm:col-span-2">{s.error_message}</p> : null}
         </CardBody>
       </Card>
+
+      {s.integrity_terminated ? (
+        <Card className="mb-6 border-amber-200 bg-amber-50/80">
+          <CardBody>
+            <h2 className="text-sm font-semibold text-amber-950">Stopped: left exam window</h2>
+            <p className="mt-2 text-sm text-amber-900/80">
+              This viva ended because of an integrity event
+              {s.integrity_termination?.reason ? ` (${s.integrity_termination.reason.replace(/_/g, ' ')})` : ''}.
+              Answers given before the stop are kept. No automatic assessment was generated.
+            </p>
+            {s.integrity_events && s.integrity_events.length > 0 ? (
+              <ul className="mt-3 space-y-1 text-xs text-amber-900/70">
+                {s.integrity_events.map((event) => (
+                  <li key={event.id}>
+                    {event.event_type.replace(/_/g, ' ')}
+                    {event.created_at ? ` · ${formatDate(event.created_at)}` : ''}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {s.proctor_frames && s.proctor_frames.length > 0 ? (
+        <Card className="mb-6">
+          <CardBody>
+            <h2 className="text-sm font-semibold text-slate-900">Monitoring snapshots</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Still frames captured during live monitoring for integrity review.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {s.proctor_frames.map((frame) =>
+                frame.url ? (
+                  <a key={frame.id} href={frame.url} target="_blank" rel="noreferrer">
+                    <img
+                      src={frame.url}
+                      alt="Monitoring snapshot"
+                      className="h-28 w-full rounded-lg object-cover"
+                    />
+                    <p className="mt-1 text-[11px] text-slate-500">{formatDate(frame.captured_at)}</p>
+                  </a>
+                ) : null,
+              )}
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
 
       <h2 className="mb-3 text-lg font-semibold">Viva dialogue</h2>
       {questions.loading ? <ProgressPanel copy={PLATFORM_PROGRESS.questions} /> : null}

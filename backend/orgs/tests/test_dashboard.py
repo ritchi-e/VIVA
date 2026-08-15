@@ -48,6 +48,11 @@ class DashboardApiTests(TestCase):
         self.assertEqual(response.data["students_count"], 1)
         self.assertEqual(len(response.data["recent_sessions"]), 1)
         self.assertEqual(response.data["recent_sessions"][0]["student_name"], "Student One")
+        self.assertIn("sessions_by_day", response.data)
+        self.assertIn("score_buckets", response.data)
+        self.assertIn("by_assignment", response.data)
+        self.assertEqual(response.data["integrity_terminations"], 0)
+        self.assertEqual(response.data["viva_completion"]["integrity_terminated"], 0)
 
     def test_student_dashboard_list(self):
         response = self.client.get(reverse("org-dashboard-students"))

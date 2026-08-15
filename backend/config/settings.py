@@ -215,6 +215,16 @@ RUMIK_TTS_DEFAULT_SPEAKER = os.getenv("RUMIK_TTS_DEFAULT_SPEAKER", "siya")
 RUMIK_TTS_TIMEOUT = float(os.getenv("RUMIK_TTS_TIMEOUT", "45") or 45)
 TTS_PROVIDER = os.getenv("TTS_PROVIDER", "").strip().lower()  # rumik | openai | mock | auto
 
+# Deepgram Nova-3 STT (accept common env spellings)
+DEEPGRAM_API_KEY = (
+    os.getenv("DEEPGRAM_API_KEY", "")
+    or os.getenv("deepgram_nova3_api", "")
+    or os.getenv("DEEPGRAM_NOVA3_API", "")
+).strip()
+DEEPGRAM_STT_MODEL = os.getenv("DEEPGRAM_STT_MODEL", "nova-3").strip() or "nova-3"
+DEEPGRAM_STT_TIMEOUT = float(os.getenv("DEEPGRAM_STT_TIMEOUT", "45") or 45)
+STT_PROVIDER = os.getenv("STT_PROVIDER", "").strip().lower()  # deepgram | mock | auto
+
 
 GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
 GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")

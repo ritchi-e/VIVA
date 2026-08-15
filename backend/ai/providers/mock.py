@@ -131,7 +131,16 @@ class MockEmbeddingProvider(EmbeddingProvider):
 
 
 class MockSTTProvider(STTProvider):
-    def transcribe(self, audio_bytes: bytes, content_type: str = "audio/wav") -> str:
+    def transcribe(
+        self,
+        audio_bytes: bytes,
+        content_type: str = "audio/wav",
+        *,
+        keyterms: list[str] | None = None,
+    ) -> str:
+        hint = ", ".join((keyterms or [])[:5])
+        if hint:
+            return f"Mock transcription mentioning {hint}."
         return "Mock transcription of student answer."
 
 

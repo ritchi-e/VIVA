@@ -138,6 +138,7 @@ services:
       args:
         VITE_API_URL: http://localhost:18000/api
         VITE_WS_URL: ws://localhost:18000/ws
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
     ports:
       - "13000:80"
     depends_on:

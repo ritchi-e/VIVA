@@ -2,11 +2,13 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton'
+import { LogoStacked } from '@/components/brand/Logo'
 import { useAuth } from '@/context/AuthContext'
 import { getApiErrorMessage } from '@/lib/api'
 
 export function RegisterPage() {
-  const { register, isAuthenticated } = useAuth()
+  const { register, loginWithGoogle, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -46,11 +48,10 @@ export function RegisterPage() {
       </div>
       <div className="relative w-full max-w-lg animate-viva-fade-up">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-cyan-700 font-display text-sm font-bold text-white shadow-lg shadow-teal-700/25">
-            AV
-          </div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-900">AI Viva</h1>
-          <p className="mt-2 text-sm text-slate-500">Create a workspace for oral assessment</p>
+          <Link to="/" className="inline-block">
+            <LogoStacked className="mx-auto h-28" />
+          </Link>
+          <p className="mt-3 text-sm text-slate-500">Create a workspace for oral assessment</p>
         </div>
         <div className="rounded-2xl border border-[var(--color-border)] bg-white/90 p-6 shadow-xl shadow-slate-900/5 backdrop-blur-sm sm:p-8">
           <h2 className="font-display text-lg font-semibold text-slate-900">Create your account</h2>
@@ -98,6 +99,23 @@ export function RegisterPage() {
               Create account
             </Button>
           </form>
+          <div className="mt-5">
+            <p className="mb-3 text-center text-xs uppercase tracking-[0.14em] text-slate-400">or</p>
+            <GoogleSignInButton
+              disabled={loading}
+              onCredential={(credential) => {
+                setLoading(true)
+                setError(null)
+                void loginWithGoogle({
+                  credential,
+                  role: role === 'instructor' || role === 'organization_admin' ? 'instructor' : 'student',
+                })
+                  .then(() => navigate(role === 'student' ? '/student/dashboard' : '/dashboard'))
+                  .catch((err) => setError(getApiErrorMessage(err)))
+                  .finally(() => setLoading(false))
+              }}
+            />
+          </div>
           <p className="mt-5 text-center text-sm text-slate-500">
             Already have an account?{' '}
             <Link className="font-medium text-teal-800 hover:underline" to="/login">

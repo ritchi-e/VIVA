@@ -103,3 +103,39 @@ class AnswerEvaluation(UUIDModel, SoftDeleteModel):
     evidence_refs = models.JSONField(default=list, blank=True)
     raw = models.JSONField(default=dict, blank=True)
     is_ai_generated = models.BooleanField(default=True)
+
+
+class VivaIntegrityEvent(UUIDModel, SoftDeleteModel):
+    class EventType(models.TextChoices):
+        TAB_HIDDEN = "tab_hidden", "Tab hidden"
+        TAB_RETURNED = "tab_returned", "Tab returned"
+        GRACE_EXPIRED = "grace_expired", "Grace expired"
+        CAMERA_DENIED = "camera_denied", "Camera denied"
+        FRAME_UPLOADED = "frame_uploaded", "Frame uploaded"
+        FULLSCREEN_LEFT = "fullscreen_left", "Fullscreen left"
+
+    session = models.ForeignKey(VivaSession, on_delete=models.CASCADE, related_name="integrity_events")
+    event_type = models.CharField(max_length=32, choices=EventType.choices)
+    client_ts = models.DateTimeField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["session", "event_type"]),
+        ]
+
+
+class VivaProctorFrame(UUIDModel, SoftDeleteModel):
+    session = models.ForeignKey(VivaSession, on_delete=models.CASCADE, related_name="proctor_frames")
+    storage_key = models.CharField(max_length=1024)
+    captured_at = models.DateTimeField(auto_now_add=True)
+    content_type = models.CharField(max_length=64, default="image/jpeg")
+    byte_size = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["captured_at"]
+        indexes = [
+            models.Index(fields=["session", "captured_at"]),
+        ]
+

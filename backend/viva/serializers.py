@@ -90,6 +90,10 @@ class VivaSessionSerializer(serializers.ModelSerializer):
     student_email = serializers.EmailField(source="student.email", read_only=True)
     student_name = serializers.CharField(source="student.full_name", read_only=True)
     assignment_title = serializers.CharField(source="assignment.title", read_only=True)
+    integrity_terminated = serializers.SerializerMethodField()
+    integrity_termination = serializers.SerializerMethodField()
+    integrity_events = serializers.SerializerMethodField()
+    proctor_frames = serializers.SerializerMethodField()
 
     class Meta:
         model = VivaSession
@@ -111,6 +115,10 @@ class VivaSessionSerializer(serializers.ModelSerializer):
             "error_message",
             "questions",
             "created_at",
+            "integrity_terminated",
+            "integrity_termination",
+            "integrity_events",
+            "proctor_frames",
         )
         read_only_fields = (
             "id",
@@ -122,7 +130,62 @@ class VivaSessionSerializer(serializers.ModelSerializer):
             "error_message",
             "questions",
             "created_at",
+            "integrity_terminated",
+            "integrity_termination",
+            "integrity_events",
+            "proctor_frames",
         )
+
+    def _viewer_is_student(self) -> bool:
+        request = self.context.get("request")
+        if not request or not getattr(request, "user", None):
+            return True
+        return getattr(request.user, "active_role", None) == "student"
+
+    def get_integrity_terminated(self, obj) -> bool:
+        config = obj.config if isinstance(obj.config, dict) else {}
+        return bool(config.get("integrity_termination")) or (
+            obj.state == VivaSession.State.FAILED and "left the exam window" in (obj.error_message or "")
+        )
+
+    def get_integrity_termination(self, obj):
+        config = obj.config if isinstance(obj.config, dict) else {}
+        return config.get("integrity_termination") or None
+
+    def get_integrity_events(self, obj):
+        events = list(obj.integrity_events.all()[:80])
+        return [
+            {
+                "id": str(event.id),
+                "event_type": event.event_type,
+                "client_ts": event.client_ts,
+                "created_at": event.created_at,
+                "metadata": event.metadata if not self._viewer_is_student() else {},
+            }
+            for event in events
+        ]
+
+    def get_proctor_frames(self, obj):
+        if self._viewer_is_student():
+            return []
+        from common.storage import generate_presigned_url
+
+        frames = list(obj.proctor_frames.all()[:40])
+        payload = []
+        for frame in frames:
+            item = {
+                "id": str(frame.id),
+                "captured_at": frame.captured_at,
+                "content_type": frame.content_type,
+                "byte_size": frame.byte_size,
+                "url": "",
+            }
+            try:
+                item["url"] = generate_presigned_url(frame.storage_key, expires_in=3600)
+            except Exception:
+                item["url"] = ""
+            payload.append(item)
+        return payload
 
 
 class VivaSessionCreateSerializer(serializers.ModelSerializer):

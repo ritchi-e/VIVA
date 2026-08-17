@@ -21,7 +21,8 @@ Last updated: 2026-08-09
 | Tests | ✅ Done | 6 pytest tests + frontend production build |
 | AI evaluation | ✅ Done | Synthetic suite; mock provider results in `scripts/eval/results.json` |
 | Demo seed | ✅ Done | `python manage.py seed_demo_data` |
-| CI | ✅ Done | GitHub Actions: backend, frontend, docker build, ai-eval |
+| CI | ✅ Done | GitHub Actions: backend tests/coverage, frontend lint/build, Docker, AI eval |
+| CD | ✅ Done | GHCR image publish + SSH deploy to Linode + health check |
 
 Legend: ✅ Done · 🟡 In progress · ⬜ Pending
 

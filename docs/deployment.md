@@ -104,15 +104,92 @@ docker compose -f docker-compose.prod.yml up -d --build frontend
 
 Do **not** use `docker-compose.yml` (dev) on the server — it publishes Postgres/Redis/MinIO/Grafana to the public host.
 
-### 6. Updates
+### 6. Updates (manual)
 
 ```bash
 cd mokhik
 git pull
-docker compose -f docker-compose.prod.yml up -d --build
+./scripts/deploy-prod.sh
 ```
 
-### 7. Backups
+### 7. CI/CD (GitHub Actions → Linode)
+
+Production deploys are automated:
+
+```mermaid
+flowchart LR
+  PR[Pull request] --> CI[CI workflow]
+  Push[Push to main] --> CI
+  CI -->|lint / test / docker build / AI eval| Gate{All green?}
+  Gate -->|yes| CD[CD workflow]
+  CD --> GHCR[Push images to GHCR]
+  GHCR --> SSH[SSH to Linode]
+  SSH --> Pull[Pull images + compose up]
+  Pull --> Smoke[Health check]
+```
+
+| Workflow | File | Trigger | What it does |
+|----------|------|---------|--------------|
+| **CI** | `.github/workflows/ci.yml` | PR + push to `main` | Backend tests + coverage, migration check, frontend lint/build, Compose validation, Docker image builds, mock AI eval |
+| **CD** | `.github/workflows/cd.yml` | After successful CI on `main`, or manual dispatch | Build/push `viva-backend` + `viva-frontend` to GHCR, SSH deploy, smoke-test `https://mokhik.online/api/health/` |
+
+#### One-time GitHub setup
+
+1. **Repository secrets** (Settings → Secrets and variables → Actions):
+
+| Secret | Example | Purpose |
+|--------|---------|---------|
+| `DEPLOY_HOST` | `203.0.113.10` | Linode public IP or hostname |
+| `DEPLOY_USER` | `deploy` | SSH user on the VPS |
+| `DEPLOY_SSH_KEY` | `-----BEGIN OPENSSH...` | Private key (ed25519 recommended) |
+| `DEPLOY_PATH` | `/home/deploy/mokhik` | Absolute path to the git clone |
+| `DEPLOY_PORT` | `22` | Optional; defaults to 22 |
+| `GHCR_PULL_TOKEN` | `ghp_...` | Optional PAT with `read:packages` if GHCR images stay private |
+
+2. **Repository variables** (optional overrides):
+
+| Variable | Default |
+|----------|---------|
+| `VITE_API_URL` | `https://mokhik.online/api` |
+| `VITE_WS_URL` | `wss://mokhik.online/ws` |
+| `VITE_GOOGLE_CLIENT_ID` | _(empty)_ |
+| `HEALTHCHECK_URL` | `https://mokhik.online/api/health/` |
+
+3. **GitHub Environment** named `production` (created automatically on first CD run). Optionally add required reviewers for resume / safety.
+
+4. **SSH on the Linode host**
+
+```bash
+# On your laptop — create a deploy key pair (do not reuse your personal key)
+ssh-keygen -t ed25519 -C "github-actions-viva" -f ./viva-deploy -N ""
+
+# On the Linode host
+sudo adduser --disabled-password deploy   # if needed
+sudo usermod -aG docker deploy
+mkdir -p /home/deploy/.ssh
+# append viva-deploy.pub to /home/deploy/.ssh/authorized_keys
+# clone repo once as that user:
+sudo -u deploy git clone https://github.com/ritchi-e/VIVA.git /home/deploy/mokhik
+sudo -u deploy cp /home/deploy/mokhik/.env.production.example /home/deploy/mokhik/.env
+# edit .env with real secrets
+```
+
+Paste the **private** key contents into `DEPLOY_SSH_KEY`.
+
+5. **GHCR visibility** — after the first successful CD push, open  
+   `https://github.com/users/ritchi-e/packages` → `viva-backend` / `viva-frontend` → Package settings → change visibility to **Public**  
+   (or set `GHCR_PULL_TOKEN` so the server can pull private images).
+
+6. Push to `main` (or run **CD** → “Run workflow”). Confirm the Actions run and then `https://mokhik.online/api/health/`.
+
+#### Resume / interview talking points
+
+- Separated **CI** (quality gates on every PR) from **CD** (deploy only after green main).
+- Immutable deploy artifacts via **GHCR** (`:sha` + `:latest` tags).
+- **SSH deploy** to a single Linode VPS with Compose, TLS via Caddy, and post-deploy health checks.
+- Frontend production env baked at image build time (`VITE_*` build args).
+
+### 8. Backups
 
 - Snapshot the Linode weekly, or
 - `docker compose -f docker-compose.prod.yml exec postgres pg_dump -U aiviva aiviva > backup.sql`

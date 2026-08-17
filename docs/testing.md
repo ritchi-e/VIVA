@@ -27,9 +27,14 @@ Playwright path (target):
 
 Create org → instructor → course → assignment → rubric → student → submit → process → viva → assess → instructor modify → finalize.
 
-## CI (Phase 12)
+## CI / CD
 
-GitHub Actions: lint, test, Docker build, migration check.
+| Pipeline | Trigger | Jobs |
+|----------|---------|------|
+| **CI** (`.github/workflows/ci.yml`) | PR + push to `main` | Backend tests + coverage, migration check, frontend lint/build, Compose validation, Docker builds, mock AI eval |
+| **CD** (`.github/workflows/cd.yml`) | Successful CI on `main` | Push images to GHCR → SSH deploy to Linode → health check |
+
+See [deployment.md](deployment.md#7-cicd-github-actions--linode) for secrets and Linode wiring.
 
 ## Related
 

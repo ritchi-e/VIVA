@@ -34,9 +34,10 @@ Thank you for your interest in contributing. This project is a production-orient
 
 ## Testing
 
-- Run backend tests: `docker compose exec backend python manage.py test` (when test suite is present).
-- Run frontend lint/build per `frontend/package.json` scripts.
-- E2E and AI evaluation suites are documented in [docs/testing.md](docs/testing.md) and [docs/ai-evaluation.md](docs/ai-evaluation.md).
+- Backend: `cd backend && pytest -q` (CI also runs coverage + migration check).
+- Frontend: `cd frontend && npm ci && npm run lint && npm run build`.
+- AI eval: `python scripts/eval/run_eval.py` (mock provider).
+- See [docs/testing.md](docs/testing.md) and [docs/deployment.md](docs/deployment.md) for CI/CD.
 
 ## Pull requests
 

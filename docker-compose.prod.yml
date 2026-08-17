@@ -1,8 +1,14 @@
 # Production stack for a single Linode (or similar) VPS.
-# Usage:
+#
+# Manual deploy (build on the host):
 #   cp .env.production.example .env
-#   # edit .env, then:
 #   docker compose -f docker-compose.prod.yml up -d --build
+#
+# CI/CD deploy (pull pre-built images from GHCR):
+#   export VIVA_BACKEND_IMAGE=ghcr.io/<owner>/viva-backend:<tag>
+#   export VIVA_FRONTEND_IMAGE=ghcr.io/<owner>/viva-frontend:<tag>
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
 #
 # Public ports: 80 + 443 only (Caddy). Everything else stays on the Docker network.
 
@@ -66,6 +72,7 @@ services:
       AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME:-aiviva}
 
   backend:
+    image: ${VIVA_BACKEND_IMAGE:-ghcr.io/ritchi-e/viva-backend:latest}
     build:
       context: ./backend
     restart: unless-stopped
@@ -98,6 +105,7 @@ services:
       retries: 10
 
   celery-worker:
+    image: ${VIVA_BACKEND_IMAGE:-ghcr.io/ritchi-e/viva-backend:latest}
     build:
       context: ./backend
     restart: unless-stopped
@@ -120,6 +128,7 @@ services:
     command: celery -A config worker -l info --concurrency=2 -Q celery,ingestion
 
   celery-beat:
+    image: ${VIVA_BACKEND_IMAGE:-ghcr.io/ritchi-e/viva-backend:latest}
     build:
       context: ./backend
     restart: unless-stopped
@@ -135,6 +144,7 @@ services:
     command: celery -A config beat -l info
 
   frontend:
+    image: ${VIVA_FRONTEND_IMAGE:-ghcr.io/ritchi-e/viva-frontend:latest}
     build:
       context: ./frontend
       args:

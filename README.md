@@ -1,5 +1,8 @@
 # AI Viva
 
+[![CI](https://github.com/ritchi-e/VIVA/actions/workflows/ci.yml/badge.svg)](https://github.com/ritchi-e/VIVA/actions/workflows/ci.yml)
+[![CD](https://github.com/ritchi-e/VIVA/actions/workflows/cd.yml/badge.svg)](https://github.com/ritchi-e/VIVA/actions/workflows/cd.yml)
+
 **Assess understanding, not AI usage.**
 
 AI Viva is a multi-tenant SaaS platform for educational assessment. Instructors define assignments, rubrics, and learning outcomes; students submit work; the system conducts an adaptive oral or text **viva** grounded in that submission and produces an **evidence-backed, AI-generated assessment** for **instructor review**—not automatic grading.
@@ -131,9 +134,19 @@ Details: [docs/architecture.md](docs/architecture.md), [docs/development-plan.md
 backend/     Django apps (accounts, orgs, courses, assignments, …)
 frontend/    React Vite SPA
 docs/        PRD, SRS, architecture, ADRs, runbooks
-infra/       Prometheus / Grafana provisioning
+infra/       Prometheus / Grafana / Caddy
+scripts/     Deploy + AI eval helpers
+.github/     CI (tests) + CD (GHCR → Linode)
 docker-compose.yml
+docker-compose.prod.yml
 ```
+
+## CI/CD
+
+- **CI** on every PR: backend pytest + coverage, migration check, frontend lint/build, Docker builds, mock AI eval.
+- **CD** after green `main`: push images to GitHub Container Registry, SSH deploy to Linode (`mokhik.online`), smoke-test `/api/health/`.
+
+Full setup (secrets, deploy key, GHCR): [docs/deployment.md](docs/deployment.md#7-cicd-github-actions--linode).
 
 ## Documentation
 

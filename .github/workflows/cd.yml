@@ -1,0 +1,187 @@
+name: CD
+
+# Deploys only after CI succeeds on main (or manual run).
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build & push images
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+      backend_image: ${{ steps.names.outputs.backend }}
+      frontend_image: ${{ steps.names.outputs.frontend }}
+      git_sha: ${{ steps.meta.outputs.sha }}
+    steps:
+      - name: Resolve commit SHA
+        id: meta
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            SHA="${{ github.event.workflow_run.head_sha }}"
+          else
+            SHA="${{ github.sha }}"
+          fi
+          SHORT="$(echo "$SHA" | cut -c1-7)"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "version=${SHORT}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.sha }}
+
+      - name: Image names (lowercase)
+        id: names
+        run: |
+          OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          echo "backend=ghcr.io/${OWNER}/viva-backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=ghcr.io/${OWNER}/viva-frontend" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ steps.names.outputs.backend }}:${{ steps.meta.outputs.version }}
+            ${{ steps.names.outputs.backend }}:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ steps.names.outputs.frontend }}:${{ steps.meta.outputs.version }}
+            ${{ steps.names.outputs.frontend }}:latest
+          build-args: |
+            VITE_API_URL=${{ vars.VITE_API_URL || 'https://mokhik.online/api' }}
+            VITE_WS_URL=${{ vars.VITE_WS_URL || 'wss://mokhik.online/ws' }}
+            VITE_GOOGLE_CLIENT_ID=${{ vars.VITE_GOOGLE_CLIENT_ID || '' }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      # Public repo → public images so the Linode host can pull without a PAT.
+      - name: Ensure GHCR packages are public
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for pkg in viva-backend viva-frontend; do
+            gh api --method PUT \
+              -H "Accept: application/vnd.github+json" \
+              "/user/packages/container/${pkg}/visibility" \
+              -f visibility=public \
+              || echo "Could not set ${pkg} public (set manually or use GHCR_PULL_TOKEN)."
+          done
+
+  deploy:
+    name: Deploy to Linode
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    environment:
+      name: production
+      url: https://mokhik.online
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          BACKEND_IMAGE: ${{ needs.build-and-push.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ needs.build-and-push.outputs.frontend_image }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          GHCR_USER: ${{ github.repository_owner }}
+          GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script_stop: true
+          envs: BACKEND_IMAGE,FRONTEND_IMAGE,IMAGE_TAG,DEPLOY_PATH,GHCR_USER,GHCR_TOKEN
+          script: |
+            set -euo pipefail
+
+            cd "${DEPLOY_PATH:?Set GitHub secret DEPLOY_PATH to the app directory on the server}"
+
+            if [[ ! -f .env ]]; then
+              echo "Missing .env on server — copy .env.production.example and fill secrets first."
+              exit 1
+            fi
+
+            if grep -qE 'REPLACE_WITH|REPLACE_MINIO' .env; then
+              echo "Refusing to deploy: .env still contains REPLACE_ placeholders."
+              exit 1
+            fi
+
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
+
+            if [[ -n "${GHCR_TOKEN:-}" ]]; then
+              echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            fi
+
+            export VIVA_BACKEND_IMAGE="${BACKEND_IMAGE}:${IMAGE_TAG}"
+            export VIVA_FRONTEND_IMAGE="${FRONTEND_IMAGE}:${IMAGE_TAG}"
+
+            docker compose -f docker-compose.prod.yml pull backend frontend celery-worker celery-beat
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker image prune -f
+
+            echo "Waiting for backend health..."
+            for i in $(seq 1 30); do
+              if docker compose -f docker-compose.prod.yml exec -T backend \
+                   curl -fsS http://localhost:8000/api/health/ >/dev/null 2>&1; then
+                echo "Backend healthy."
+                docker compose -f docker-compose.prod.yml ps
+                exit 0
+              fi
+              sleep 5
+            done
+
+            echo "Health check failed after deploy."
+            docker compose -f docker-compose.prod.yml logs --tail=80 backend caddy || true
+            exit 1
+
+      - name: Public smoke test
+        run: |
+          set -euo pipefail
+          URL="${{ vars.HEALTHCHECK_URL || 'https://mokhik.online/api/health/' }}"
+          echo "Probing ${URL}"
+          for i in $(seq 1 20); do
+            if curl -fsS "$URL"; then
+              echo
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Public health check failed"
+          exit 1

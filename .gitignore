@@ -75,6 +75,8 @@ docker-compose.override.yml
 *.pem
 *.key
 credentials.json
+viva-deploy
+viva-deploy.pub
 
 #docs
 docs/interview-guide.md

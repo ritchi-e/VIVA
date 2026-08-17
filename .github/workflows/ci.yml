@@ -101,6 +101,8 @@ jobs:
           AWS_ACCESS_KEY_ID: ci-validation-only
           AWS_SECRET_ACCESS_KEY: ci-validation-only-secret
         run: |
+          # prod compose references env_file: .env (gitignored); stub it for validation only
+          cp .env.production.example .env
           docker compose -f docker-compose.yml config --quiet
           docker compose -f docker-compose.prod.yml config --quiet
 

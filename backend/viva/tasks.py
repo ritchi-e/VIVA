@@ -18,10 +18,13 @@ def start_due_viva_slots():
     from viva.models import VivaSession, VivaSlotBooking
 
     now = timezone.now()
+    created_sessions = []
 
     with transaction.atomic():
         due = list(
-            VivaSlotBooking.objects.select_for_update(skip_locked=True).filter(
+            VivaSlotBooking.objects.select_for_update(skip_locked=True)
+            .select_related("assignment__course__organization")
+            .filter(
                 status=VivaSlotBooking.Status.BOOKED,
                 slot_start__lte=now,
                 is_deleted=False,
@@ -29,17 +32,31 @@ def start_due_viva_slots():
         )
 
         for booking in due:
+            viva_config = booking.assignment.viva_config or {}
+            budget = viva_config.get("question_budget", 6)
             session = VivaSession.objects.create(
                 assignment=booking.assignment,
                 submission=booking.submission,
                 student=booking.student,
                 state=VivaSession.State.CREATED,
+                question_budget=budget,
                 time_limit_seconds=settings.VIVA_SLOT_DURATION_MINUTES * 60,
             )
             booking.viva_session = session
             booking.status = VivaSlotBooking.Status.STARTED
             booking.save(update_fields=["viva_session", "status", "updated_at"])
+            created_sessions.append((session, booking.assignment.course.organization))
             logger.info("Slot booking %s started -> session %s", booking.id, session.id)
+
+    # Pre-prepare sessions outside the transaction so students don't wait
+    for session, org in created_sessions:
+        try:
+            from viva.orchestrator import VivaOrchestrator
+            orch = VivaOrchestrator(session, org)
+            orch.prepare()
+            logger.info("Pre-prepared session %s (state=%s)", session.id, session.state)
+        except Exception:
+            logger.exception("Failed to pre-prepare session %s", session.id)
 
     return {"started": len(due)}
 

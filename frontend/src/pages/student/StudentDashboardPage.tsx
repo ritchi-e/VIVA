@@ -1,11 +1,13 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { assignmentsApi, submissionsApi, vivaApi, slotsApi, type SlotBooking } from '@/lib/api'
+import { assignmentsApi, submissionsApi, vivaApi, slotsApi, getApiErrorMessage, type SlotBooking } from '@/lib/api'
 import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { ProgressPanel } from '@/components/ui/Spinner'
+import { PreparingVivaOverlay } from '@/components/viva/PreparingVivaOverlay'
 import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { formatDate } from '@/lib/utils'
 
@@ -15,10 +17,11 @@ function slotTimeLabel(iso: string) {
 }
 
 function slotTone(b: SlotBooking): 'success' | 'info' | 'warning' | 'danger' | 'default' {
-  if (b.status === 'STARTED') return 'success'
-  if (b.status === 'BOOKED') return 'info'
-  if (b.status === 'COMPLETED') return 'default'
-  if (b.status === 'NO_SHOW') return 'danger'
+  const s = b.status.toLowerCase()
+  if (s === 'started') return 'success'
+  if (s === 'booked') return 'info'
+  if (s === 'completed') return 'default'
+  if (s === 'no_show') return 'danger'
   return 'default'
 }
 
@@ -28,6 +31,34 @@ export function StudentDashboardPage() {
   const submissions = useAsync(() => submissionsApi.list())
   const sessions = useAsync(() => vivaApi.list())
   const bookings = useAsync(() => slotsApi.my())
+  const [startingViva, setStartingViva] = useState(false)
+  const [vivaError, setVivaError] = useState<string | null>(null)
+
+  const startVivaFromBooking = async (b: SlotBooking) => {
+    setStartingViva(true)
+    setVivaError(null)
+    try {
+      const response = await vivaApi.start({
+        assignment: b.assignment,
+        submission: b.submission,
+        mode: 'text',
+      })
+      const sessionId = response.data?.id ? String(response.data.id) : ''
+      if (!sessionId || sessionId === 'undefined') {
+        setVivaError('Could not start the viva. Please try again.')
+        return
+      }
+      if (response.data.state === 'FAILED') {
+        setVivaError(response.data.error_message || 'Preparing viva failed. Please try again.')
+        return
+      }
+      navigate(`/student/viva/${sessionId}`)
+    } catch (err) {
+      setVivaError(getApiErrorMessage(err))
+    } finally {
+      setStartingViva(false)
+    }
+  }
 
   const published = (assignments.data || []).filter((a) => a.status === 'published')
   const recentSessions = (sessions.data || []).slice(0, 5)
@@ -35,6 +66,7 @@ export function StudentDashboardPage() {
 
   return (
     <div>
+      {startingViva && <PreparingVivaOverlay />}
       <PageHeader title="Student dashboard" description="Your assignments, submissions, and viva progress." />
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
@@ -57,23 +89,27 @@ export function StudentDashboardPage() {
         </Card>
       </div>
 
+      {vivaError && (
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{vivaError}</div>
+      )}
+
       {(assignments.loading || submissions.loading || sessions.loading) && (
         <div className="mt-6">
           <ProgressPanel copy={PLATFORM_PROGRESS.dashboard} />
         </div>
       )}
 
-      {(bookings.data ?? []).filter((b) => b.status === 'BOOKED' || b.status === 'STARTED').length > 0 && (
+      {(bookings.data ?? []).filter((b) => b.status === 'booked' || b.status === 'started').length > 0 && (
         <Card className="mt-6">
           <CardBody>
             <h2 className="mb-3 text-sm font-semibold text-slate-900">Upcoming booked slots</h2>
             <ul className="space-y-3">
               {bookings.data!
-                .filter((b) => b.status === 'BOOKED' || b.status === 'STARTED')
+                .filter((b) => b.status === 'booked' || b.status === 'started')
                 .map((b) => {
                   const startsAt = new Date(b.slot_start)
                   const now = new Date()
-                  const canJoin = b.status === 'STARTED' || startsAt <= now
+                  const canJoin = b.status === 'started' || startsAt <= now
                   return (
                     <li key={b.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
                       <div>
@@ -87,7 +123,7 @@ export function StudentDashboardPage() {
                             Join viva
                           </Button>
                         ) : canJoin ? (
-                          <Button className="px-3 py-1.5 text-xs" onClick={() => navigate(`/student/assignments/${b.assignment}`)}>
+                          <Button className="px-3 py-1.5 text-xs" loading={startingViva} onClick={() => startVivaFromBooking(b)}>
                             Start viva
                           </Button>
                         ) : (

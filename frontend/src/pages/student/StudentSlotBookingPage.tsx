@@ -132,6 +132,20 @@ export function StudentSlotBookingPage() {
         </Card>
       )}
 
+      <div className="flex items-center gap-4 text-xs text-slate-500">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded border border-slate-200 bg-white" /> Available
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded border border-slate-100 bg-slate-100" /> Filled
+        </span>
+        {activeBooking && (
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded border border-teal-500 bg-teal-50" /> Your slot
+          </span>
+        )}
+      </div>
+
       {Array.from(grouped.entries()).map(([dateKey, daySlots]) => (
         <div key={dateKey}>
           <h3 className="mb-3 text-sm font-semibold text-slate-600">{formatDate(daySlots[0].slot_start)}</h3>
@@ -148,16 +162,13 @@ export function StudentSlotBookingPage() {
                     isBooked
                       ? 'border-teal-500 bg-teal-50 font-semibold text-teal-700'
                       : full
-                        ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400'
+                        ? 'cursor-not-allowed border-slate-100 bg-slate-100 text-slate-400'
                         : activeBooking
                           ? 'cursor-not-allowed border-slate-200 bg-white text-slate-500'
                           : 'cursor-pointer border-slate-200 bg-white text-slate-800 hover:border-teal-400 hover:bg-teal-50'
                   }`}
                 >
                   <div className="font-medium">{formatTime(slot.slot_start)}</div>
-                  <div className={`mt-1 text-xs ${full ? 'text-red-400' : 'text-slate-400'}`}>
-                    {full ? 'Full' : `${slot.available} left`}
-                  </div>
                 </button>
               )
             })}

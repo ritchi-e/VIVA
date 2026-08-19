@@ -16,15 +16,6 @@ function slotTimeLabel(iso: string) {
   return d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-function slotTone(b: SlotBooking): 'success' | 'info' | 'warning' | 'danger' | 'default' {
-  const s = b.status.toLowerCase()
-  if (s === 'started') return 'success'
-  if (s === 'booked') return 'info'
-  if (s === 'completed') return 'default'
-  if (s === 'no_show') return 'danger'
-  return 'default'
-}
-
 export function StudentDashboardPage() {
   const navigate = useNavigate()
   const assignments = useAsync(() => assignmentsApi.list())
@@ -108,17 +99,20 @@ export function StudentDashboardPage() {
                 .filter((b) => b.status === 'booked' || b.status === 'started')
                 .map((b) => {
                   const startsAt = new Date(b.slot_start)
+                  const endsAt = new Date(b.slot_end)
                   const now = new Date()
-                  const canJoin = b.status === 'started' || startsAt <= now
+                  const expired = now > endsAt
+                  const canJoin = !expired && (b.status === 'started' || startsAt <= now)
                   return (
-                    <li key={b.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                    <li key={b.id} className={`flex items-center justify-between gap-3 rounded-lg border px-4 py-3 ${expired ? 'border-red-100 bg-red-50/50' : 'border-slate-100 bg-slate-50'}`}>
                       <div>
                         <p className="text-sm font-medium text-slate-900">{b.assignment_title}</p>
                         <p className="text-xs text-slate-500">{slotTimeLabel(b.slot_start)} — {slotTimeLabel(b.slot_end)}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge tone={slotTone(b)}>{b.status}</Badge>
-                        {canJoin && b.viva_session_id ? (
+                        {expired ? (
+                          <span className="text-xs font-medium text-red-600">Slot expired</span>
+                        ) : canJoin && b.viva_session_id ? (
                           <Button className="px-3 py-1.5 text-xs" onClick={() => navigate(`/student/viva/${b.viva_session_id}`)}>
                             Join viva
                           </Button>

@@ -1,4 +1,5 @@
 from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -93,12 +94,30 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
             request=self.request,
         )
 
+    def _check_slot_expiry(self, user, assignment_id):
+        """Reject if the student's booked slot has already ended."""
+        from viva.models import VivaSlotBooking
+        booking = VivaSlotBooking.objects.filter(
+            student=user,
+            assignment_id=assignment_id,
+            status__in=[VivaSlotBooking.Status.BOOKED, VivaSlotBooking.Status.STARTED],
+            is_deleted=False,
+        ).first()
+        if booking and booking.slot_end < timezone.now():
+            return Response(
+                {"detail": "Your booked slot has expired. Please book a new slot."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return None
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        expired = self._check_slot_expiry(request.user, request.data.get("assignment"))
+        if expired:
+            return expired
         self.perform_create(serializer)
         session = serializer.instance
-        # Return full session payload (includes id) for the SPA redirect
         return Response(VivaSessionSerializer(session).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])

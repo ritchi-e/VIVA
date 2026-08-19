@@ -51,7 +51,7 @@ class VivaOrchestrator:
         self.session.save(update_fields=["state", "updated_at"])
 
     def prepare(self) -> VivaSession:
-        import time
+        from django.db import transaction
 
         self._refresh()
         if self.session.state in (
@@ -63,8 +63,8 @@ class VivaOrchestrator:
         ):
             return self.session
 
-        # Another request may already be preparing — wait briefly instead of racing.
         if self.session.state == VivaSession.State.PREPARING:
+            import time
             for _ in range(90):
                 time.sleep(1)
                 self._refresh()
@@ -77,7 +77,19 @@ class VivaOrchestrator:
         if self.session.state != VivaSession.State.CREATED:
             return self.session
 
-        self._transition(VivaSession.State.PREPARING)
+        # Atomic check-and-set: only one request wins the CREATED -> PREPARING transition
+        with transaction.atomic():
+            locked = (
+                VivaSession.objects.select_for_update(skip_locked=True)
+                .filter(pk=self.session.pk, state=VivaSession.State.CREATED)
+                .first()
+            )
+            if locked is None:
+                self._refresh()
+                return self.session
+            locked.state = VivaSession.State.PREPARING
+            locked.save(update_fields=["state", "updated_at"])
+            self.session = locked
         submission = self.session.submission
         if submission.status != Submission.Status.READY:
             self.session.error_message = "Submission is not ready for viva"
@@ -305,6 +317,13 @@ class VivaOrchestrator:
             if concept and concept not in covered_concepts:
                 covered_concepts.append(concept)
         coverage["covered_concepts"] = covered_concepts
+
+        question_types_seen = list(coverage.get("question_types_seen") or [])
+        q_type = str(vq.question_type or "")
+        if q_type and q_type not in question_types_seen:
+            question_types_seen.append(q_type)
+        coverage["question_types_seen"] = question_types_seen
+
         self.session.coverage_state = coverage
 
         if answer_analysis:

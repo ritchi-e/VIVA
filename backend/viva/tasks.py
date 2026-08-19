@@ -3,9 +3,71 @@ from __future__ import annotations
 import logging
 
 from celery import shared_task
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task
+def start_due_viva_slots():
+    """Find bookings whose slot_start <= now and status=booked, create + prepare VivaSession."""
+    from django.db import transaction
+
+    from viva.models import VivaSession, VivaSlotBooking
+
+    now = timezone.now()
+
+    with transaction.atomic():
+        due = list(
+            VivaSlotBooking.objects.select_for_update(skip_locked=True).filter(
+                status=VivaSlotBooking.Status.BOOKED,
+                slot_start__lte=now,
+                is_deleted=False,
+            )
+        )
+
+        for booking in due:
+            session = VivaSession.objects.create(
+                assignment=booking.assignment,
+                submission=booking.submission,
+                student=booking.student,
+                state=VivaSession.State.CREATED,
+                time_limit_seconds=settings.VIVA_SLOT_DURATION_MINUTES * 60,
+            )
+            booking.viva_session = session
+            booking.status = VivaSlotBooking.Status.STARTED
+            booking.save(update_fields=["viva_session", "status", "updated_at"])
+            logger.info("Slot booking %s started -> session %s", booking.id, session.id)
+
+    return {"started": len(due)}
+
+
+@shared_task
+def mark_no_show_bookings():
+    """Mark bookings as no_show if slot_end passed and session never progressed."""
+    from viva.models import VivaSession, VivaSlotBooking
+
+    now = timezone.now()
+    stale = VivaSlotBooking.objects.filter(
+        status__in=[VivaSlotBooking.Status.BOOKED, VivaSlotBooking.Status.STARTED],
+        slot_end__lt=now,
+        is_deleted=False,
+    )
+
+    count = 0
+    for booking in stale:
+        session = booking.viva_session
+        if session is None or session.state in (VivaSession.State.CREATED, VivaSession.State.PREPARING):
+            booking.status = VivaSlotBooking.Status.NO_SHOW
+            booking.save(update_fields=["status", "updated_at"])
+            count += 1
+        elif session.state in (VivaSession.State.COMPLETED, VivaSession.State.REVIEW_REQUIRED):
+            booking.status = VivaSlotBooking.Status.COMPLETED
+            booking.save(update_fields=["status", "updated_at"])
+
+    return {"no_shows": count}
 
 
 def _load_session_for_post_process(session_id: str):

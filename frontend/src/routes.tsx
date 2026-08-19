@@ -24,6 +24,7 @@ import { StudentAssignmentsPage } from '@/pages/student/StudentAssignmentsPage'
 import { StudentAssignmentDetailPage } from '@/pages/student/StudentAssignmentDetailPage'
 import { StudentSubmissionPage } from '@/pages/student/StudentSubmissionPage'
 import { StudentVivaPage } from '@/pages/student/StudentVivaPage'
+import { StudentSlotBookingPage } from '@/pages/student/StudentSlotBookingPage'
 import { StudentResultsPage } from '@/pages/student/StudentResultsPage'
 import { HomeRedirect } from '@/components/auth/HomeRedirect'
 
@@ -60,6 +61,7 @@ export function AppRoutes() {
           <Route path="/student/assignments" element={<StudentAssignmentsPage />} />
           <Route path="/student/assignments/:id" element={<StudentAssignmentDetailPage />} />
           <Route path="/student/submissions/:id" element={<StudentSubmissionPage />} />
+          <Route path="/student/assignments/:id/book-slot" element={<StudentSlotBookingPage />} />
           <Route path="/student/viva/:id" element={<StudentVivaPage />} />
           <Route path="/student/results/:id" element={<StudentResultsPage />} />
         </Route>

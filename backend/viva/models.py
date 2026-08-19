@@ -126,6 +126,41 @@ class VivaIntegrityEvent(UUIDModel, SoftDeleteModel):
         ]
 
 
+class VivaSlotBooking(UUIDModel, SoftDeleteModel):
+    class Status(models.TextChoices):
+        BOOKED = "booked", "Booked"
+        STARTED = "started", "Started"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+        NO_SHOW = "no_show", "No-show"
+
+    student = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="slot_bookings")
+    assignment = models.ForeignKey("assignments.Assignment", on_delete=models.CASCADE, related_name="slot_bookings")
+    submission = models.ForeignKey("submissions.Submission", on_delete=models.CASCADE, related_name="slot_bookings")
+    slot_start = models.DateTimeField()
+    slot_end = models.DateTimeField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.BOOKED)
+    viva_session = models.OneToOneField(
+        "viva.VivaSession", on_delete=models.SET_NULL, null=True, blank=True, related_name="slot_booking",
+    )
+
+    class Meta:
+        ordering = ["slot_start"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "assignment"],
+                condition=models.Q(is_deleted=False, status__in=["booked", "started"]),
+                name="unique_active_booking_per_student_assignment",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["slot_start", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.student} | {self.slot_start:%Y-%m-%d %H:%M} | {self.status}"
+
+
 class VivaProctorFrame(UUIDModel, SoftDeleteModel):
     session = models.ForeignKey(VivaSession, on_delete=models.CASCADE, related_name="proctor_frames")
     storage_key = models.CharField(max_length=1024)

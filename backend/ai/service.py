@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from decimal import Decimal
 from typing import Any
@@ -9,6 +10,8 @@ from django.utils import timezone
 from ai.models import AIRequest
 from ai.providers import get_chat_provider, get_embedding_provider
 from ai.providers.base import ChatMessage
+
+logger = logging.getLogger(__name__)
 
 
 COST_PER_1K = {
@@ -67,22 +70,52 @@ class AIService:
             self._log(provider_name, "unknown", "chat", 0, 0, int((time.monotonic() - start) * 1000), False, str(exc))
             raise
 
+    @staticmethod
+    def _validate_structured(data: Any, schema: dict[str, Any]) -> list[str]:
+        """Check required fields and score ranges. Returns list of issues."""
+        if not isinstance(data, dict):
+            return ["response is not a dict"]
+        issues: list[str] = []
+        for field in schema.get("required", []):
+            if field not in data:
+                issues.append(f"missing required field: {field}")
+        props = schema.get("properties", {})
+        for key, spec in props.items():
+            if key not in data:
+                continue
+            if spec.get("type") == "number" and isinstance(data[key], (int, float)):
+                if not (0 <= data[key] <= 10):
+                    data[key] = max(0, min(10, data[key]))
+        return issues
+
     def structured(self, messages: list[dict[str, str]], schema: dict[str, Any], **kwargs):
         start = time.monotonic()
         provider_name = type(self.chat_provider).__name__
         model_name = kwargs.get("model") or getattr(self.chat_provider, "model", "mock")
-        try:
-            result = self.chat_provider.structured(
-                [ChatMessage(**m) for m in messages],
-                schema,
-                **kwargs,
-            )
-            self._log(provider_name, model_name, "structured",
-                      result.input_tokens, result.output_tokens, int((time.monotonic() - start) * 1000), True)
-            return result
-        except Exception as exc:
-            self._log(provider_name, "unknown", "structured", 0, 0, int((time.monotonic() - start) * 1000), False, str(exc))
-            raise
+        max_attempts = 3
+        last_exc: Exception | None = None
+        for attempt in range(max_attempts):
+            try:
+                result = self.chat_provider.structured(
+                    [ChatMessage(**m) for m in messages],
+                    schema,
+                    **kwargs,
+                )
+                issues = self._validate_structured(result.data, schema)
+                if issues and attempt < max_attempts - 1:
+                    logger.warning("Structured output validation failed (attempt %d): %s", attempt + 1, issues)
+                    continue
+                self._log(provider_name, model_name, "structured",
+                          result.input_tokens, result.output_tokens, int((time.monotonic() - start) * 1000), True)
+                return result
+            except Exception as exc:
+                last_exc = exc
+                if attempt < max_attempts - 1:
+                    logger.warning("Structured call failed (attempt %d), retrying: %s", attempt + 1, exc)
+                    continue
+                self._log(provider_name, "unknown", "structured", 0, 0, int((time.monotonic() - start) * 1000), False, str(exc))
+                raise
+        raise last_exc  # type: ignore[misc]
 
     def embed(self, texts: list[str]):
         start = time.monotonic()

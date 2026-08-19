@@ -97,7 +97,7 @@ services:
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
              python manage.py ensure_bucket &&
-             daphne -b 0.0.0.0 -p 8000 config.asgi:application"
+             daphne -b 0.0.0.0 -p 8000 -w 4 config.asgi:application"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
       interval: 20s
@@ -125,7 +125,30 @@ services:
         condition: service_healthy
       backend:
         condition: service_started
-    command: celery -A config worker -l info --concurrency=2 -Q celery,ingestion
+    command: celery -A config worker -l info --concurrency=4 -Q celery
+
+  celery-ingestion:
+    image: ${VIVA_BACKEND_IMAGE:-ghcr.io/ritchi-e/viva-backend:latest}
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      AWS_S3_ENDPOINT_URL: http://minio:9000
+      DJANGO_DEBUG: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    command: celery -A config worker -l info --concurrency=2 -Q ingestion
 
   celery-beat:
     image: ${VIVA_BACKEND_IMAGE:-ghcr.io/ritchi-e/viva-backend:latest}

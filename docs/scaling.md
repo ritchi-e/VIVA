@@ -1,44 +1,70 @@
-# Scaling
+# Scaling & Provider Rate Limits
 
-MVP targets single-region, modular monolith scale-out—not microservices.
+## Provider Rate Limits
 
-## Web tier
+| Provider | API | Rate Limit (Tier 1) | Timeout | Retry |
+|----------|-----|---------------------|---------|-------|
+| OpenAI | Chat (gpt-5-nano) | ~500 RPM / 200K TPM | None | 3x exponential backoff |
+| OpenAI | Embeddings (text-embedding-3-small) | ~3000 RPM | None | 3x exponential backoff |
+| OpenAI | TTS (tts-1) | ~50 RPM | None | 3x exponential backoff |
+| Deepgram | Nova-3 STT | ~100 concurrent | 45s | None (client-side) |
+| Rumik | Mulberry TTS | ~20 RPM (estimated) | 45s | None |
+| Gemini | Chat | ~60 RPM (free) / 1000 RPM (paid) | None | 3x exponential backoff |
+| Gemini | Embeddings | ~1500 RPM | None | 3x exponential backoff |
 
-- Horizontal scale: multiple **Daphne** processes behind a load balancer
-- WebSocket: sticky sessions or shared Redis channel layer (already used)
-- Static frontend: CDN or nginx container replicas
+## Concurrent Session Capacity
 
-## Workers
+### Current Architecture (Single Linode VPS)
 
-- Scale **Celery workers** independently for submission/embedding load
-- Separate queues later: `extraction`, `embeddings`, `default` if needed
+| Component | Config | Bottleneck |
+|-----------|--------|------------|
+| Daphne | 4 ASGI workers | ~60 concurrent WebSocket connections |
+| Celery (main) | 4 workers, `celery` queue | Post-viva evaluation + assessment |
+| Celery (ingestion) | 2 workers, `ingestion` queue | Submission processing |
+| Django Channels thread pool | 40 threads (default) | ~15-20 concurrent viva turns before latency degrades |
 
-## Database
+### Estimated Limits
 
-- PostgreSQL read replicas for reporting (future)
-- pgvector indexes (HNSW) when chunk count grows
-- Connection pooling (PgBouncer) at high concurrency
+- **Comfortable**: 10-15 simultaneous viva sessions
+- **Maximum before degradation**: ~20 sessions (limited by LLM call latency × thread pool)
+- **TTS bottleneck**: OpenAI TTS at 50 RPM limits to ~50 audio turns/minute across all sessions
 
-## Redis
+### Per-Session Resource Usage
 
-- Dedicated Redis for Channels vs Celery in large deploys
-- Memory limits and eviction policies tuned per workload
+Each viva session makes approximately:
+- 5-8 LLM chat calls (live turn routing)
+- 1 structured LLM call (batch evaluation)
+- 5-8 TTS calls (question audio)
+- 5-8 STT calls (answer transcription)
+- ~20K input tokens, ~5K output tokens total
 
-## Object storage
+## Scaling Recommendations
 
-- S3 scales horizontally; lifecycle policies for old submission versions
+### Tier Upgrades (Low Effort)
 
-## AI cost
+1. **OpenAI Tier 2+**: Increases RPM to 5000+ and TPM to 2M+. Apply at [platform.openai.com](https://platform.openai.com).
+2. **Deepgram Growth plan**: Higher concurrency limits for STT.
 
-- Mock in dev; cache embeddings per chunk hash
-- Smaller models for wording vs evaluation where quality allows
-- Track spend via `AIRequest` aggregates
+### Horizontal Scaling (Medium Effort)
 
-## When to split services
+1. **Multiple Daphne instances** behind a load balancer with Redis channel layer for WebSocket state sharing.
+2. **Separate Celery worker nodes** for evaluation-heavy workloads.
+3. **Redis Cluster** for channel layer and Celery broker if single Redis becomes a bottleneck.
 
-Consider extracting only if:
+### Architecture Changes (High Effort)
 
-- Embedding throughput blocks API latency despite worker scale
-- Regulatory requirement for isolated AI inference
+1. **Async LLM calls**: Move from `database_sync_to_async` wrapping synchronous OpenAI client to native async (`openai.AsyncOpenAI`). Eliminates thread pool exhaustion.
+2. **Streaming responses**: Use OpenAI streaming to start TTS while the LLM is still generating, reducing perceived latency.
+3. **Pre-generation**: Generate the next question while the student is answering the current one (speculative execution).
 
-Otherwise retain monolith per [ADR-001](adr/ADR-001-modular-monolith-architecture.md).
+## Monitoring
+
+Track these metrics via the `AIRequest` model:
+- `latency_ms` per provider/request_type — alert if p95 exceeds 3s
+- Error rate by provider — alert on sustained >5% failure rate
+- Token usage trends — forecast tier upgrade needs
+
+Run the benchmark script to measure baseline:
+```bash
+python scripts/benchmark_viva.py --base-url http://localhost:8000 --concurrency 10 --questions 5
+```

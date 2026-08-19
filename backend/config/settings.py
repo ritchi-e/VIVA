@@ -283,6 +283,12 @@ REPO_FETCH_TIMEOUT_SEC = int(os.getenv("REPO_FETCH_TIMEOUT_SEC", "45"))
 REPO_PARSER_CONCURRENCY = int(os.getenv("REPO_PARSER_CONCURRENCY", "4"))
 EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "64"))
 
+# Viva slot booking
+VIVA_SLOT_DURATION_MINUTES = int(os.getenv("VIVA_SLOT_DURATION_MINUTES", "10"))
+VIVA_MAX_CONCURRENT_SESSIONS = int(os.getenv("VIVA_MAX_CONCURRENT_SESSIONS", "10"))
+VIVA_SLOT_LOOKAHEAD_HOURS = int(os.getenv("VIVA_SLOT_LOOKAHEAD_HOURS", "48"))
+VIVA_SLOT_BUFFER_MINUTES = int(os.getenv("VIVA_SLOT_BUFFER_MINUTES", "5"))
+
 CELERY_TASK_ROUTES = {
     "submissions.tasks.process_submission_task": {"queue": "ingestion"},
 }

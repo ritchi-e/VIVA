@@ -206,9 +206,16 @@ export function StudentAssignmentDetailPage() {
         </Card>
       ) : null}
       {error ? <p className="mb-3 text-sm text-red-600">{error}</p> : null}
-      <Button onClick={startViva} loading={starting} disabled={!latestSubmission || starting || processing}>
-        Start viva session
-      </Button>
+      <div className="flex gap-3">
+        <Button onClick={startViva} loading={starting} disabled={!latestSubmission || starting || processing}>
+          Start viva session
+        </Button>
+        {latestSubmission && latestSubmission.status === 'ready' && (
+          <Button variant="secondary" onClick={() => navigate(`/student/assignments/${id}/book-slot`)}>
+            Book viva slot
+          </Button>
+        )}
+      </div>
     </div>
   )
 }

@@ -348,6 +348,36 @@ export const adminApi = {
   aiUsage: () => api.get<AiUsageMetrics>('/ai/usage/'),
 }
 
+export interface SlotWindow {
+  slot_start: string
+  slot_end: string
+  capacity: number
+  booked: number
+  available: number
+}
+
+export interface SlotBooking {
+  id: string
+  student: string
+  student_name: string
+  assignment: string
+  assignment_title: string
+  submission: string
+  slot_start: string
+  slot_end: string
+  status: string
+  viva_session_id: string | null
+  created_at: string
+}
+
+export const slotsApi = {
+  available: () => api.get<SlotWindow[]>('/viva/slots/available/').then((r) => r.data),
+  book: (assignmentId: string, slotStart: string) =>
+    api.post<SlotBooking>('/viva/slots/book/', { assignment_id: assignmentId, slot_start: slotStart }),
+  cancel: (bookingId: string) => api.post<SlotBooking>(`/viva/slots/${bookingId}/cancel/`),
+  my: () => api.get<SlotBooking[]>('/viva/slots/my/').then((r) => r.data),
+}
+
 export function getVivaWebSocketUrl(sessionId: string, accessToken: string) {
   const base = import.meta.env.VITE_WS_URL ?? 'ws://localhost:18000/ws'
   const url = new URL(`${base.replace(/\/$/, '')}/viva/${sessionId}/`)

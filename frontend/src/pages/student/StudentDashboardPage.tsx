@@ -1,17 +1,33 @@
-import { Link } from 'react-router-dom'
-import { assignmentsApi, submissionsApi, vivaApi } from '@/lib/api'
+import { Link, useNavigate } from 'react-router-dom'
+import { assignmentsApi, submissionsApi, vivaApi, slotsApi, type SlotBooking } from '@/lib/api'
 import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
 import { ProgressPanel } from '@/components/ui/Spinner'
 import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { formatDate } from '@/lib/utils'
 
+function slotTimeLabel(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function slotTone(b: SlotBooking): 'success' | 'info' | 'warning' | 'danger' | 'default' {
+  if (b.status === 'STARTED') return 'success'
+  if (b.status === 'BOOKED') return 'info'
+  if (b.status === 'COMPLETED') return 'default'
+  if (b.status === 'NO_SHOW') return 'danger'
+  return 'default'
+}
+
 export function StudentDashboardPage() {
+  const navigate = useNavigate()
   const assignments = useAsync(() => assignmentsApi.list())
   const submissions = useAsync(() => submissionsApi.list())
   const sessions = useAsync(() => vivaApi.list())
+  const bookings = useAsync(() => slotsApi.my())
 
   const published = (assignments.data || []).filter((a) => a.status === 'published')
   const recentSessions = (sessions.data || []).slice(0, 5)
@@ -45,6 +61,47 @@ export function StudentDashboardPage() {
         <div className="mt-6">
           <ProgressPanel copy={PLATFORM_PROGRESS.dashboard} />
         </div>
+      )}
+
+      {(bookings.data ?? []).filter((b) => b.status === 'BOOKED' || b.status === 'STARTED').length > 0 && (
+        <Card className="mt-6">
+          <CardBody>
+            <h2 className="mb-3 text-sm font-semibold text-slate-900">Upcoming booked slots</h2>
+            <ul className="space-y-3">
+              {bookings.data!
+                .filter((b) => b.status === 'BOOKED' || b.status === 'STARTED')
+                .map((b) => {
+                  const startsAt = new Date(b.slot_start)
+                  const now = new Date()
+                  const canJoin = b.status === 'STARTED' || startsAt <= now
+                  return (
+                    <li key={b.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">{b.assignment_title}</p>
+                        <p className="text-xs text-slate-500">{slotTimeLabel(b.slot_start)} — {slotTimeLabel(b.slot_end)}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge tone={slotTone(b)}>{b.status}</Badge>
+                        {canJoin && b.viva_session_id ? (
+                          <Button className="px-3 py-1.5 text-xs" onClick={() => navigate(`/student/viva/${b.viva_session_id}`)}>
+                            Join viva
+                          </Button>
+                        ) : canJoin ? (
+                          <Button className="px-3 py-1.5 text-xs" onClick={() => navigate(`/student/assignments/${b.assignment}`)}>
+                            Start viva
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-slate-500">
+                            Starts {startsAt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+            </ul>
+          </CardBody>
+        </Card>
       )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">

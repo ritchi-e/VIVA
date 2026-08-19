@@ -1,7 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion, useScroll, useTransform } from 'motion/react'
-import { ArrowUpRight, BarChart3, Menu, MessagesSquare, ShieldCheck, X } from 'lucide-react'
+import {
+  ArrowUpRight,
+  BarChart3,
+  Check,
+  FileText,
+  GitBranch,
+  Menu,
+  MessagesSquare,
+  Mic,
+  ShieldCheck,
+  X,
+  Zap,
+} from 'lucide-react'
 import { LogoLight, LogoMarkLight, WordmarkLight } from '@/components/brand/Logo'
 import { LiquidChrome } from '@/components/landing/LiquidChrome'
 import {
@@ -26,6 +38,7 @@ import { cn } from '@/lib/utils'
 const CONTACT_EMAIL = 'hello@mokhik.com'
 
 const NAV = [
+  { href: '#how-it-works', label: 'How it works' },
   { href: '#showcase', label: 'Showcase' },
   { href: '#platform', label: 'Platform' },
   { href: '#pricing', label: 'Pricing' },
@@ -252,8 +265,9 @@ function Hero() {
             transition={{ duration: 0.9, delay: 0.85 }}
             className={cn('mx-auto mt-8 max-w-xl', TYPE.lead)}
           >
-            Mokhik runs a spoken viva on every submission — grounded in the student's own repository,
-            proctored end to end, and returned to you as evidence-linked rubric scores.
+            Students upload documents or link their GitHub repo. Mokhik reads the submission,
+            runs an adaptive spoken viva grounded in their own work, and returns evidence-linked
+            rubric scores for you to review.
           </motion.p>
 
           <motion.div
@@ -313,6 +327,179 @@ function TrustStrip() {
           </span>
         ))}
       </Marquee>
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ * How it works — horizontal flow, GitHub-focused
+ * ------------------------------------------------------------------ */
+
+const FLOW_STEPS = [
+  { icon: GitBranch, label: 'Link repo', color: '#2de2b2' },
+  { icon: Zap, label: 'Extract & embed', color: '#7dd3fc' },
+  { icon: Mic, label: 'Adaptive viva', color: '#a78bfa' },
+  { icon: Check, label: 'Evidence report', color: '#f59e0b' },
+]
+
+function GitHubMockTerminal() {
+  const [step, setStep] = useState(0)
+
+  const lines = [
+    { prompt: true, text: 'github.com/alex-morgan/neural-network-report' },
+    { prompt: false, text: '  ├── README.md' },
+    { prompt: false, text: '  ├── src/model.py          → ResNet-18, batch norm, Adam' },
+    { prompt: false, text: '  ├── src/train.py           → 40 epochs, early stopping' },
+    { prompt: false, text: '  ├── notebooks/analysis.ipynb' },
+    { prompt: false, text: '  └── docs/report.pdf' },
+    { prompt: false, text: '' },
+    { prompt: false, text: '  ✓ 23 files indexed · 147 chunks embedded · 3 knowledge nodes' },
+    { prompt: false, text: '  ✓ Question plan: 8 questions across 4 rubric criteria' },
+    { prompt: false, text: '  ✓ Ready for viva' },
+  ]
+
+  useEffect(() => {
+    if (step >= lines.length) return
+    const delay = step === 0 ? 800 : step < 6 ? 180 : step === 6 ? 500 : 400
+    const timer = setTimeout(() => setStep((s) => s + 1), delay)
+    return () => clearTimeout(timer)
+  }, [step, lines.length])
+
+  useEffect(() => {
+    const restart = setInterval(() => setStep(0), 12000)
+    return () => clearInterval(restart)
+  }, [])
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/8 bg-black/60 backdrop-blur-xl">
+      {/* Title bar */}
+      <div className="flex items-center gap-2 border-b border-white/6 px-4 py-2.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+        <span className="ml-3 font-mono text-[10px] text-white/30">mokhik — submission ingestion</span>
+      </div>
+
+      <div className="p-5 font-mono text-[12px] leading-[1.9] sm:text-[13px]">
+        {lines.slice(0, step).map((line, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className={cn(
+              line.prompt ? 'text-[#7ff5d3]' : 'text-white/40',
+              line.text.startsWith('  ✓') && 'text-[#2de2b2]/80',
+            )}
+          >
+            {line.prompt && <span className="text-white/25">❯ </span>}
+            {line.text}
+          </motion.div>
+        ))}
+        {step < lines.length && (
+          <span className="inline-block h-4 w-1.5 animate-pulse bg-[#2de2b2]/70" />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function HowItWorks() {
+  return (
+    <section id="how-it-works" className={cn(SECTION, 'scroll-mt-24')}>
+      <GridOverlay className="opacity-40" />
+      <div className={cn(SHELL, 'relative')}>
+        <SectionHead
+          eyebrow="How it works"
+          title="Paste a GitHub link. We handle the rest."
+          highlight={['GitHub']}
+          body="Link a repository or upload a document — the system reads every file, embeds the content, plans viva questions grounded in the student's own code, and delivers an evidence-backed assessment to the instructor."
+        />
+
+        {/* Flow steps */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7, delay: 0.15 }}
+          className="mx-auto mt-16 max-w-3xl"
+        >
+          <div className="flex items-center justify-between">
+            {FLOW_STEPS.map((s, i) => (
+              <div key={s.label} className="flex items-center gap-0 flex-1 last:flex-none">
+                <div className="flex flex-col items-center gap-2.5">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    whileInView={{ scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 + i * 0.12 }}
+                    className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]"
+                    style={{ boxShadow: `0 0 30px -10px ${s.color}40` }}
+                  >
+                    <s.icon className="h-5 w-5" style={{ color: s.color }} />
+                  </motion.div>
+                  <span className="text-[11px] font-medium text-white/50">{s.label}</span>
+                </div>
+                {i < FLOW_STEPS.length - 1 && (
+                  <motion.div
+                    initial={{ scaleX: 0 }}
+                    whileInView={{ scaleX: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.6, delay: 0.3 + i * 0.12 }}
+                    className="mx-3 mb-6 h-px flex-1 origin-left"
+                    style={{ background: `linear-gradient(to right, ${s.color}40, ${FLOW_STEPS[i + 1].color}40)` }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* GitHub terminal + side info */}
+        <div className="mt-16 grid items-start gap-10 lg:grid-cols-[1.3fr_1fr]">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+          >
+            <GitHubMockTerminal />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, delay: 0.35 }}
+            className="space-y-6"
+          >
+            <div>
+              <h3 className={TYPE.h3}>Every question traces back to their code</h3>
+              <p className={cn('mt-3', TYPE.body)}>
+                The planner reads the repo tree, parses functions and classes, and generates questions
+                it can anchor to a real file and line range. Ungrounded questions are discarded before
+                the student ever sees them.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { label: 'Documents', items: 'PDF · DOCX · PPTX · ZIP', icon: FileText },
+                { label: 'Repositories', items: 'Public & private GitHub repos', icon: GitBranch },
+                { label: 'Processing', items: 'Extract → chunk → embed → knowledge graph', icon: Zap },
+              ].map((row) => (
+                <div key={row.label} className="flex items-start gap-3 rounded-xl border border-white/6 bg-white/[0.015] px-4 py-3">
+                  <row.icon className="mt-0.5 h-4 w-4 shrink-0 text-[#2de2b2]/60" />
+                  <div>
+                    <p className="text-[13px] font-medium text-white/70">{row.label}</p>
+                    <p className="text-[12px] text-white/35">{row.items}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </div>
     </section>
   )
 }
@@ -681,6 +868,7 @@ export function HomePage() {
         <Hero />
         <TrustStrip />
         <Showcase />
+        <HowItWorks />
         <Platform />
         <Metrics />
         <Pricing />

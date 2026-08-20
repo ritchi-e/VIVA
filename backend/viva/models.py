@@ -154,7 +154,7 @@ class VivaSlotBooking(UUIDModel, SoftDeleteModel):
             ),
         ]
         indexes = [
-            models.Index(fields=["slot_start", "status"]),
+            models.Index(fields=["slot_start", "status"], name="viva_vivasl_slot_st_idx"),
         ]
 
     def __str__(self):

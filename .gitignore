@@ -70,6 +70,7 @@ dist-ssr/
 
 # Docker
 docker-compose.override.yml
+celerybeat-schedule*
 
 # Secrets / keys
 *.pem

@@ -71,7 +71,10 @@ export function AssignmentDetailPage() {
                   <Link to={`/submissions/${s.id}`} className="font-medium text-blue-700 hover:underline">
                     {s.student_name || s.student_email || 'Student'}
                   </Link>
-                  <Badge tone={s.status === 'ready' ? 'success' : 'default'}>{s.status}</Badge>
+                  <div className="flex items-center gap-2">
+                    {s.assignment_mismatch ? <Badge tone="warning">Unrelated</Badge> : null}
+                    <Badge tone={s.status === 'ready' ? 'success' : 'default'}>{s.status}</Badge>
+                  </div>
                 </li>
               ))}
             </ul>

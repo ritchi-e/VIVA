@@ -14,6 +14,7 @@ from common.storage import download_bytes
 from orgs.models import Organization
 from rag.knowledge import build_knowledge_nodes
 from submissions.adapters import get_adapter
+from submissions.alignment import assess_assignment_alignment
 from submissions.metrics import EMBED_CACHE, INGESTION_FAILURES, INGESTION_STAGE_DURATION
 from submissions.models import EmbeddingCache, Submission, SubmissionChunk, SubmissionFile
 from submissions.repository.candidates import generate_question_candidates
@@ -243,6 +244,7 @@ def run_submission_pipeline(submission_id: str) -> None:
                 ),
             }
         submission.knowledge_representation = knowledge
+        assess_assignment_alignment(submission, extracted)
         submission.status = Submission.Status.READY
         submission.processing_stage = Submission.ProcessingStage.COMPLETE
         submission.processed_at = timezone.now()
@@ -253,6 +255,9 @@ def run_submission_pipeline(submission_id: str) -> None:
                 "status",
                 "processing_stage",
                 "processed_at",
+                "assignment_mismatch",
+                "assignment_mismatch_reason",
+                "assignment_alignment_score",
                 "updated_at",
             ]
         )

@@ -36,14 +36,20 @@ export function SubmissionsPage() {
                 <p className="mt-1 text-sm text-slate-500">
                   {s.student_name || s.student_email || s.student} · {formatDate(s.created_at)}
                 </p>
+                {s.assignment_mismatch ? (
+                  <p className="mt-1 text-sm font-medium text-amber-800">Not related to this assignment</p>
+                ) : null}
               </div>
               <div className="flex items-center gap-3">
                 <Link to={`/assignments/${s.assignment}`} className="text-xs text-blue-700 hover:underline">
                   Assignment
                 </Link>
-                <Badge tone={s.status === 'ready' ? 'success' : s.status === 'failed' ? 'danger' : 'info'}>
-                  {s.status}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {s.assignment_mismatch ? <Badge tone="warning">Unrelated</Badge> : null}
+                  <Badge tone={s.status === 'ready' ? 'success' : s.status === 'failed' ? 'danger' : 'info'}>
+                    {s.status}
+                  </Badge>
+                </div>
               </div>
             </CardBody>
           </Card>

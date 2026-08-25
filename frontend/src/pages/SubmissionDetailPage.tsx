@@ -10,6 +10,8 @@ import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
 import { AssessmentReview } from '@/components/assessment/AssessmentReview'
 import { RepositorySummary } from '@/components/submissions/RepositorySummary'
+import { AssignmentMismatchBanner } from '@/components/submissions/AssignmentMismatchBanner'
+import { SubmissionWorkViewer } from '@/components/submissions/SubmissionWorkViewer'
 import type { Assessment } from '@/types'
 import { formatDate } from '@/lib/utils'
 
@@ -41,6 +43,14 @@ export function SubmissionDetailPage() {
           </Link>
         }
       />
+      {submission.data.assignment_mismatch ? (
+        <div className="mb-6">
+          <AssignmentMismatchBanner
+            mismatch={submission.data.assignment_mismatch}
+            reason={submission.data.assignment_mismatch_reason}
+          />
+        </div>
+      ) : null}
       <Card className="mb-6">
         <CardBody className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
           <p>
@@ -56,13 +66,21 @@ export function SubmissionDetailPage() {
           {submission.data.processing_error ? (
             <p className="text-red-600 sm:col-span-2">{submission.data.processing_error}</p>
           ) : null}
-          {submission.data.github_url || submission.data.repository ? (
-            <div className="sm:col-span-2">
-              <RepositorySummary submission={submission.data} />
-            </div>
-          ) : null}
         </CardBody>
       </Card>
+      <Card className="mb-6">
+        <CardBody>
+          <h2 className="mb-4 text-sm font-semibold text-slate-900">Submitted work</h2>
+          <SubmissionWorkViewer submission={submission.data} />
+        </CardBody>
+      </Card>
+      {submission.data.repository ? (
+        <Card className="mb-6">
+          <CardBody>
+            <RepositorySummary submission={submission.data} />
+          </CardBody>
+        </Card>
+      ) : null}
 
       {assessmentQuery.loading ? <ProgressPanel copy={PLATFORM_PROGRESS.assessment} /> : null}
       {activeAssessment ? (

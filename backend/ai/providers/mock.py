@@ -89,6 +89,8 @@ class MockChatProvider(ChatProvider):
             data = _mock_batch_evaluation(user_content)
         elif "viva_live_turn" in title or "viva_next_turn" in title or "next_turn" in title:
             data = _mock_next_turn(user_content)
+        elif "assignment_alignment" in title:
+            data = _mock_assignment_alignment(user_content)
         elif "follow_up" in title:
             data = _mock_follow_up_wording(user_content)
         elif "question" in title:
@@ -473,6 +475,44 @@ def _mock_next_turn(user_content: str) -> dict[str, Any]:
             else f"What design choice did you make around '{snippet[:80]}'?"
         ),
         "rationale": "Mock follow-up after shallow answer." if shallow else "Mock conversational advance.",
+    }
+
+
+def _mock_assignment_alignment(user_content: str) -> dict[str, Any]:
+    assignment = ""
+    submission = user_content
+    match = re.search(
+        r"<assignment>(.*?)</assignment>\s*<submission>(.*?)</submission>",
+        user_content,
+        re.S | re.I,
+    )
+    if match:
+        assignment = match.group(1)
+        submission = match.group(2)
+
+    ml = {"machine", "learning", "neural", "cnn", "dataset", "classifier", "model"}
+    sde = {"django", "react", "rest", "api", "microservice", "backend", "frontend", "sde"}
+
+    def tokens(text: str) -> set[str]:
+        return set(re.findall(r"[a-z0-9]+", text.lower()))
+
+    asg_tokens = tokens(assignment)
+    sub_tokens = tokens(submission)
+    asg_ml = bool(asg_tokens & ml)
+    asg_sde = bool(asg_tokens & sde)
+    sub_ml = bool(sub_tokens & ml)
+    sub_sde = bool(sub_tokens & sde)
+    domain_clash = (asg_ml and sub_sde and not sub_ml) or (asg_sde and sub_ml and not sub_sde)
+    if domain_clash:
+        return {
+            "related": False,
+            "alignment_score": 0.05,
+            "reason": "The submission is about a different subject than the assignment.",
+        }
+    return {
+        "related": True,
+        "alignment_score": 0.85,
+        "reason": "Submission appears related to the assignment.",
     }
 
 

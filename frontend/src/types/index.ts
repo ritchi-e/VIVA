@@ -129,6 +129,16 @@ export interface SubmissionStatus {
   } | null
 }
 
+export interface SubmissionFile {
+  id: string
+  original_filename: string
+  content_type: string
+  file_type: 'pdf' | 'docx' | 'pptx' | 'zip' | 'other' | string
+  size_bytes: number
+  extracted_text?: string
+  created_at?: string
+}
+
 export interface Submission {
   id: string
   assignment: string
@@ -141,9 +151,13 @@ export interface Submission {
   github_url: string
   metadata: Record<string, unknown>
   processing_error: string
+  assignment_mismatch?: boolean
+  assignment_mismatch_reason?: string
+  assignment_alignment_score?: number | null
   processed_at: string | null
   version: number
   created_at?: string
+  files?: SubmissionFile[]
   repository?: RepositorySnapshot | null
 }
 

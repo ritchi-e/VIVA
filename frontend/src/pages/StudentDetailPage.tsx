@@ -44,10 +44,16 @@ export function StudentDetailPage() {
                   {sub.assignment_title || 'Submission'} · v{sub.version}
                 </Link>
                 <p className="mt-1 text-sm text-slate-500">{formatDate(sub.created_at)}</p>
+                {sub.assignment_mismatch ? (
+                  <p className="mt-1 text-sm font-medium text-amber-800">Not related to this assignment</p>
+                ) : null}
               </div>
-              <Badge tone={sub.status === 'ready' ? 'success' : sub.status === 'failed' ? 'danger' : 'info'}>
-                {sub.status}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {sub.assignment_mismatch ? <Badge tone="warning">Unrelated</Badge> : null}
+                <Badge tone={sub.status === 'ready' ? 'success' : sub.status === 'failed' ? 'danger' : 'info'}>
+                  {sub.status}
+                </Badge>
+              </div>
             </CardBody>
           </Card>
         ))}

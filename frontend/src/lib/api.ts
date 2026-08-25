@@ -226,6 +226,8 @@ export const submissionsApi = {
     api.post<Submission>('/submissions/', payload, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  fileContent: (submissionId: string, fileId: string) =>
+    api.get<Blob>(`/submissions/${submissionId}/files/${fileId}/content/`, { responseType: 'blob' }),
 }
 
 export const vivaApi = {

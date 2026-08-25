@@ -42,6 +42,9 @@ class Submission(UUIDModel, SoftDeleteModel):
     metadata = models.JSONField(default=dict, blank=True)
     knowledge_representation = models.JSONField(default=dict, blank=True)
     processing_error = models.TextField(blank=True)
+    assignment_mismatch = models.BooleanField(default=False)
+    assignment_mismatch_reason = models.TextField(blank=True)
+    assignment_alignment_score = models.FloatField(null=True, blank=True)
     processed_at = models.DateTimeField(null=True, blank=True)
     version = models.PositiveIntegerField(default=1)
 

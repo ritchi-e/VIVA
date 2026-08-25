@@ -1,3 +1,7 @@
+from io import BytesIO
+from urllib.parse import quote
+
+from django.http import FileResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -6,8 +10,9 @@ from rest_framework.response import Response
 
 from audit.services import log_audit
 from common.permissions import IsInstructorOrAdmin, IsStudent
+from common.storage import download_bytes
 from common.tenancy import TenantContextMixin
-from submissions.models import Submission
+from submissions.models import Submission, SubmissionFile
 from submissions.serializers import SubmissionCreateSerializer, SubmissionSerializer
 
 
@@ -87,3 +92,32 @@ class SubmissionViewSet(TenantContextMixin, viewsets.ModelViewSet):
                 "repository": repo_payload,
             }
         )
+
+    @action(detail=True, methods=["get"], url_path=r"files/(?P<file_id>[^/.]+)/content")
+    def file_content(self, request, pk=None, file_id=None):
+        submission = self.get_object()
+        try:
+            uploaded = submission.files.get(pk=file_id)
+        except SubmissionFile.DoesNotExist:
+            return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not uploaded.storage_key:
+            return Response({"detail": "File is not available."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payload = download_bytes(uploaded.storage_key)
+        except Exception:
+            return Response({"detail": "Could not load the uploaded file."}, status=status.HTTP_404_NOT_FOUND)
+
+        filename = uploaded.original_filename or "submission"
+        content_type = uploaded.content_type or "application/octet-stream"
+        if uploaded.file_type == SubmissionFile.FileType.PDF:
+            content_type = "application/pdf"
+        elif uploaded.file_type == SubmissionFile.FileType.DOCX:
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        elif uploaded.file_type == SubmissionFile.FileType.PPTX:
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+        response = FileResponse(BytesIO(payload), content_type=content_type, as_attachment=False)
+        response["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(filename)}"
+        response["Content-Length"] = str(len(payload))
+        response["X-Frame-Options"] = "SAMEORIGIN"
+        return response

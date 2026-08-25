@@ -360,6 +360,7 @@ export interface SlotBooking {
   id: string
   student: string
   student_name: string
+  student_email?: string
   assignment: string
   assignment_title: string
   submission: string
@@ -376,6 +377,8 @@ export const slotsApi = {
     api.post<SlotBooking>('/viva/slots/book/', { assignment_id: assignmentId, slot_start: slotStart }),
   cancel: (bookingId: string) => api.post<SlotBooking>(`/viva/slots/${bookingId}/cancel/`),
   my: () => api.get<SlotBooking[]>('/viva/slots/my/').then((r) => r.data),
+  forAssignment: (assignmentId: string) =>
+    api.get<SlotBooking[]>('/viva/slots/for-assignment/', { params: { assignment: assignmentId } }).then((r) => r.data),
 }
 
 export function getVivaWebSocketUrl(sessionId: string, accessToken: string) {

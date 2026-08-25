@@ -15,6 +15,7 @@ class SlotWindowSerializer(serializers.Serializer):
 
 class VivaSlotBookingSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source="student.full_name", read_only=True)
+    student_email = serializers.EmailField(source="student.email", read_only=True)
     assignment_title = serializers.CharField(source="assignment.title", read_only=True)
     viva_session_id = serializers.UUIDField(read_only=True, allow_null=True)
 
@@ -24,6 +25,7 @@ class VivaSlotBookingSerializer(serializers.ModelSerializer):
             "id",
             "student",
             "student_name",
+            "student_email",
             "assignment",
             "assignment_title",
             "submission",
@@ -37,6 +39,7 @@ class VivaSlotBookingSerializer(serializers.ModelSerializer):
             "id",
             "student",
             "student_name",
+            "student_email",
             "assignment_title",
             "slot_end",
             "status",

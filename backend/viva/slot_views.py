@@ -12,7 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from assignments.models import Assignment
-from common.permissions import IsStudent
+from common.permissions import IsInstructorOrAdmin, IsStudent
 from common.tenancy import TenantContextMixin
 from submissions.models import Submission
 from viva.models import VivaSlotBooking
@@ -36,6 +36,11 @@ def _snap_to_slot(dt, duration_minutes: int):
 class VivaSlotViewSet(TenantContextMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated, IsStudent]
     serializer_class = VivaSlotBookingSerializer
+
+    def get_permissions(self):
+        if self.action == "for_assignment":
+            return [IsAuthenticated(), IsInstructorOrAdmin()]
+        return [IsAuthenticated(), IsStudent()]
 
     def get_queryset(self):
         return VivaSlotBooking.objects.filter(student=self.request.user)
@@ -204,4 +209,24 @@ class VivaSlotViewSet(TenantContextMixin, viewsets.GenericViewSet):
             status__in=[VivaSlotBooking.Status.BOOKED, VivaSlotBooking.Status.STARTED],
             is_deleted=False,
         ).select_related("assignment", "student")
+        return Response(VivaSlotBookingSerializer(bookings, many=True).data)
+
+    @action(detail=False, methods=["get"], url_path="for-assignment")
+    def for_assignment(self, request):
+        """Instructors: list all slot bookings for an assignment in this organization."""
+        assignment_id = request.query_params.get("assignment")
+        if not assignment_id:
+            return Response({"detail": "assignment query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        org_id = self.get_organization_id()
+        try:
+            assignment = Assignment.objects.get(pk=assignment_id, course__organization_id=org_id)
+        except Assignment.DoesNotExist:
+            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        bookings = (
+            VivaSlotBooking.objects.filter(assignment=assignment, is_deleted=False)
+            .select_related("student", "assignment")
+            .order_by("slot_start", "student__email")
+        )
         return Response(VivaSlotBookingSerializer(bookings, many=True).data)

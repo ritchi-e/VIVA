@@ -8,6 +8,7 @@ import { CoursesPage } from '@/pages/CoursesPage'
 import { CourseDetailPage } from '@/pages/CourseDetailPage'
 import { AssignmentsPage } from '@/pages/AssignmentsPage'
 import { AssignmentDetailPage } from '@/pages/AssignmentDetailPage'
+import { AssignmentBookedSlotsPage } from '@/pages/AssignmentBookedSlotsPage'
 import { AssignmentRubricPage } from '@/pages/AssignmentRubricPage'
 import { AssignmentSettingsPage } from '@/pages/AssignmentSettingsPage'
 import { SubmissionsPage } from '@/pages/SubmissionsPage'
@@ -41,6 +42,7 @@ export function AppRoutes() {
           <Route path="/courses/:id" element={<CourseDetailPage />} />
           <Route path="/assignments" element={<AssignmentsPage />} />
           <Route path="/assignments/:id" element={<AssignmentDetailPage />} />
+          <Route path="/assignments/:id/booked-slots" element={<AssignmentBookedSlotsPage />} />
           <Route path="/assignments/:id/rubric" element={<AssignmentRubricPage />} />
           <Route path="/assignments/:id/settings" element={<AssignmentSettingsPage />} />
           <Route path="/submissions" element={<SubmissionsPage />} />

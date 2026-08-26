@@ -207,7 +207,7 @@ AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1")
 # AI
 AI_PROVIDER = os.getenv("AI_PROVIDER", "mock")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-5-nano")
+OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
 # Live viva turns (question generation); defaults to chat model. Use a fast model (e.g. gpt-4o-mini) to cut latency.
 OPENAI_VIVA_MODEL = os.getenv("OPENAI_VIVA_MODEL", "") or OPENAI_CHAT_MODEL
 OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")

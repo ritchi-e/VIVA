@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 COST_PER_1K = {
-    # gpt-5-nano: $0.05 / $0.40 per 1M tokens
-    ("openai", "chat"): (Decimal("0.00005"), Decimal("0.0004")),
+    # gpt-4o-mini: $0.15 / $0.60 per 1M tokens
+    ("openai", "chat"): (Decimal("0.00015"), Decimal("0.0006")),
     # text-embedding-3-small: ~$0.02 per 1M tokens
     ("openai", "embedding"): (Decimal("0.00002"), Decimal("0")),
     ("gemini", "chat"): (Decimal("0.000075"), Decimal("0.0003")),

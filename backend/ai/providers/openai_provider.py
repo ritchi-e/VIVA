@@ -102,9 +102,13 @@ class OpenAIChatProvider(ChatProvider):
         ]
         chat_kwargs = {**kwargs}
         chat_kwargs.setdefault("max_tokens", 4096)
-        # gpt-5-nano frequently returns empty with response_format=json_object,
-        # so rely on the strong prompt instruction instead
-        chat_kwargs.pop("response_format", None)
+        model = chat_kwargs.get("model") or self.model
+        # gpt-5-nano frequently returns empty with response_format=json_object.
+        # gpt-4o-mini (and other non-nano chat models) handle json_object reliably.
+        if "nano" in (model or "").lower():
+            chat_kwargs.pop("response_format", None)
+        else:
+            chat_kwargs.setdefault("response_format", {"type": "json_object"})
         result = self.chat(augmented, **chat_kwargs)
         if not result.content.strip():
             raise ValueError("Model returned empty response")

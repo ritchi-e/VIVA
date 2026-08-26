@@ -4,7 +4,7 @@
 
 | Provider | API | Rate Limit (Tier 1) | Timeout | Retry |
 |----------|-----|---------------------|---------|-------|
-| OpenAI | Chat (gpt-5-nano) | ~500 RPM / 200K TPM | None | 3x exponential backoff |
+| OpenAI | Chat (gpt-4o-mini) | ~500 RPM / 200K TPM | None | 3x exponential backoff |
 | OpenAI | Embeddings (text-embedding-3-small) | ~3000 RPM | None | 3x exponential backoff |
 | OpenAI | TTS (tts-1) | ~50 RPM | None | 3x exponential backoff |
 | Deepgram | Nova-3 STT | ~100 concurrent | 45s | None (client-side) |

@@ -97,7 +97,7 @@ services:
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
              python manage.py ensure_bucket &&
-             daphne -b 0.0.0.0 -p 8000 -w 4 config.asgi:application"
+             daphne -b 0.0.0.0 -p 8000 config.asgi:application"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
       interval: 20s

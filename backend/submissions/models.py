@@ -290,3 +290,33 @@ class SubmissionVersion(UUIDModel, SoftDeleteModel):
 
     class Meta:
         unique_together = ("submission", "version_number")
+
+
+class PlagiarismReport(UUIDModel, SoftDeleteModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        COMPLETE = "complete", "Complete"
+        SKIPPED = "skipped", "Skipped"
+
+    submission = models.OneToOneField(
+        Submission,
+        on_delete=models.CASCADE,
+        related_name="plagiarism_report",
+    )
+    viva_session = models.ForeignKey(
+        "viva.VivaSession",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="plagiarism_reports",
+    )
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    checked_at = models.DateTimeField(null=True, blank=True)
+    plagiarism_detected = models.BooleanField(default=False)
+    highest_similarity = models.FloatField(default=0.0)
+    peer_count = models.PositiveIntegerField(default=0)
+    summary = models.TextField(blank=True)
+    matches = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["plagiarism_detected", "checked_at"])]

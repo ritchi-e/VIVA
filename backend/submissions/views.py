@@ -29,7 +29,7 @@ class SubmissionViewSet(TenantContextMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         org_id = self.get_organization_id()
         qs = Submission.objects.filter(assignment__course__organization_id=org_id).select_related(
-            "assignment", "student", "repository"
+            "assignment", "student", "repository", "plagiarism_report"
         ).prefetch_related("files", "repository__files")
         role = getattr(self.request.user, "active_role", None)
         if role == "student":

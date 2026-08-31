@@ -8,6 +8,7 @@ Phases 9–12: voice polish, security/observability, tests/AI eval, demo seed, C
 
 ## V2 (documented, not committed)
 
+- **Assignment-level plagiarism report** — instructor sets viva booking deadline; after all vivas complete, run one cohort-wide check and deliver a single detailed report (who, why, evidence). Current MVP is per-submission only. See [plagiarism.md](plagiarism.md).
 - GitHub-native programming assessment workflows
 - Advanced presentation analysis (slide layout, speaker notes weighting)
 - LMS integrations (Moodle, Google Classroom)

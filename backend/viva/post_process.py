@@ -27,6 +27,12 @@ def process_completed_viva(session: VivaSession, organization: Organization) -> 
         session.save(update_fields=["state", "updated_at"])
 
     generate_assessment_for_session(session, organization)
+    try:
+        from submissions.plagiarism import generate_plagiarism_report
+
+        generate_plagiarism_report(session.submission, viva_session=session)
+    except Exception:
+        logger.exception("Plagiarism report failed for session=%s", session.id)
     logger.info(
         "Post-viva processing complete session=%s answers=%s avg=%s",
         session.id,

@@ -23,6 +23,8 @@ Last updated: 2026-08-09
 | Demo seed | ✅ Done | `python manage.py seed_demo_data` |
 | CI | ✅ Done | GitHub Actions: backend tests/coverage, frontend lint/build, Docker, AI eval |
 | CD | ✅ Done | GHCR image publish + SSH deploy to Linode + health check |
+| Plagiarism (MVP) | ✅ Done | Per-submission check after viva; instructor-only panel. See [plagiarism.md](plagiarism.md) |
+| Plagiarism (assignment batch) | ⬜ Planned | After viva booking deadline; one cohort report for instructor — [plagiarism.md](plagiarism.md) |
 
 Legend: ✅ Done · 🟡 In progress · ⬜ Pending
 

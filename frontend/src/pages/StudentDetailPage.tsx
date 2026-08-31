@@ -49,6 +49,7 @@ export function StudentDetailPage() {
                 ) : null}
               </div>
               <div className="flex items-center gap-2">
+                {sub.plagiarism_flagged ? <Badge tone="warning">Similarity</Badge> : null}
                 {sub.assignment_mismatch ? <Badge tone="warning">Unrelated</Badge> : null}
                 <Badge tone={sub.status === 'ready' ? 'success' : sub.status === 'failed' ? 'danger' : 'info'}>
                   {sub.status}

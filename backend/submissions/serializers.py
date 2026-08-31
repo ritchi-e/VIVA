@@ -8,6 +8,7 @@ from django.db.models import Max
 from rest_framework import serializers
 
 from submissions.models import (
+    PlagiarismReport,
     RepositoryFile,
     RepositorySnapshot,
     Submission,
@@ -81,12 +82,29 @@ class RepositorySnapshotSerializer(serializers.ModelSerializer):
         }
 
 
+class PlagiarismReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlagiarismReport
+        fields = (
+            "status",
+            "checked_at",
+            "plagiarism_detected",
+            "highest_similarity",
+            "peer_count",
+            "summary",
+            "matches",
+        )
+        read_only_fields = fields
+
+
 class SubmissionSerializer(serializers.ModelSerializer):
     files = SubmissionFileSerializer(many=True, read_only=True)
     repository = RepositorySnapshotSerializer(read_only=True)
     student_email = serializers.EmailField(source="student.email", read_only=True)
     student_name = serializers.CharField(source="student.full_name", read_only=True)
     assignment_title = serializers.CharField(source="assignment.title", read_only=True)
+    plagiarism_report = serializers.SerializerMethodField()
+    plagiarism_flagged = serializers.SerializerMethodField()
 
     class Meta:
         model = Submission
@@ -110,6 +128,8 @@ class SubmissionSerializer(serializers.ModelSerializer):
             "version",
             "files",
             "repository",
+            "plagiarism_report",
+            "plagiarism_flagged",
             "created_at",
             "updated_at",
         )
@@ -126,9 +146,35 @@ class SubmissionSerializer(serializers.ModelSerializer):
             "processed_at",
             "files",
             "repository",
+            "plagiarism_report",
+            "plagiarism_flagged",
             "created_at",
             "updated_at",
         )
+
+    def _is_instructor_view(self) -> bool:
+        request = self.context.get("request")
+        if not request or not getattr(request, "user", None):
+            return False
+        role = getattr(request.user, "active_role", None)
+        return role in {"instructor", "organization_admin"} or request.user.is_superuser
+
+    def get_plagiarism_report(self, obj):
+        if not self._is_instructor_view():
+            return None
+        try:
+            report = obj.plagiarism_report
+        except PlagiarismReport.DoesNotExist:
+            return None
+        return PlagiarismReportSerializer(report).data
+
+    def get_plagiarism_flagged(self, obj):
+        if not self._is_instructor_view():
+            return False
+        try:
+            return bool(obj.plagiarism_report.plagiarism_detected)
+        except PlagiarismReport.DoesNotExist:
+            return False
 
 
 class SubmissionCreateSerializer(serializers.Serializer):

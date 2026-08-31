@@ -139,6 +139,37 @@ export interface SubmissionFile {
   created_at?: string
 }
 
+export interface PlagiarismMatchSample {
+  path: string
+  other_path: string
+  kind: string
+  similarity: number
+}
+
+export interface PlagiarismMatch {
+  submission_id: string
+  student_id: string
+  student_name: string
+  student_email: string
+  similarity_score: number
+  identical_repository: boolean
+  matching_upload_files: number
+  matching_repo_files: number
+  matching_chunks: number
+  similar_chunk_pairs: number
+  sample_matches: PlagiarismMatchSample[]
+}
+
+export interface PlagiarismReport {
+  status: 'pending' | 'complete' | 'skipped'
+  checked_at: string | null
+  plagiarism_detected: boolean
+  highest_similarity: number
+  peer_count: number
+  summary: string
+  matches: PlagiarismMatch[]
+}
+
 export interface Submission {
   id: string
   assignment: string
@@ -159,6 +190,8 @@ export interface Submission {
   created_at?: string
   files?: SubmissionFile[]
   repository?: RepositorySnapshot | null
+  plagiarism_report?: PlagiarismReport | null
+  plagiarism_flagged?: boolean
 }
 
 export interface VivaSession {

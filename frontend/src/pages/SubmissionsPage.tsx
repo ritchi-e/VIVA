@@ -45,6 +45,7 @@ export function SubmissionsPage() {
                   Assignment
                 </Link>
                 <div className="flex items-center gap-2">
+                  {s.plagiarism_flagged ? <Badge tone="warning">Similarity</Badge> : null}
                   {s.assignment_mismatch ? <Badge tone="warning">Unrelated</Badge> : null}
                   <Badge tone={s.status === 'ready' ? 'success' : s.status === 'failed' ? 'danger' : 'info'}>
                     {s.status}

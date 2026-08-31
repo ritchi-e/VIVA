@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/layout/StateViews'
 import { AssessmentReview } from '@/components/assessment/AssessmentReview'
 import { RepositorySummary } from '@/components/submissions/RepositorySummary'
 import { AssignmentMismatchBanner } from '@/components/submissions/AssignmentMismatchBanner'
+import { PlagiarismReportPanel } from '@/components/submissions/PlagiarismReportPanel'
 import { SubmissionWorkViewer } from '@/components/submissions/SubmissionWorkViewer'
 import type { Assessment } from '@/types'
 import { formatSubmissionProcessingError } from '@/lib/userErrors'
@@ -86,6 +87,17 @@ export function SubmissionDetailPage() {
       ) : null}
 
       {assessmentQuery.loading ? <ProgressPanel copy={PLATFORM_PROGRESS.assessment} /> : null}
+
+      {submission.data.plagiarism_report ? (
+        <PlagiarismReportPanel report={submission.data.plagiarism_report} />
+      ) : !assessmentQuery.loading ? (
+        <Card className="mb-6">
+          <CardBody className="text-sm text-slate-600">
+            No similarity report yet. It is generated automatically after the student completes their viva.
+          </CardBody>
+        </Card>
+      ) : null}
+
       {activeAssessment ? (
         <AssessmentReview assessment={activeAssessment} onUpdated={setAssessment} />
       ) : !assessmentQuery.loading ? (

@@ -53,6 +53,10 @@ class PlagiarismDetectionTests(TestCase):
             checksum=checksum,
         )
 
+    def _embedding_for(self, content: str) -> list[float]:
+        raw = hashlib.sha256(content.encode("utf-8")).digest()
+        return [round(b / 255.0, 4) for b in raw[:8]]
+
     def _add_chunk(self, submission: Submission, content: str, index: int) -> None:
         digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
         SubmissionChunk.objects.create(
@@ -62,7 +66,7 @@ class PlagiarismDetectionTests(TestCase):
             token_count=len(content.split()),
             content_hash=digest,
             path=f"src/module{index}.py",
-            embedding=[0.1] * 8,
+            embedding=self._embedding_for(content),
         )
 
     def test_identical_uploads_are_flagged(self):

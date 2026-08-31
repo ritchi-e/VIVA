@@ -241,7 +241,15 @@ def _compare_pair(submission: Submission, peer: Submission, fp_a: _Fingerprints,
     embed_ratio, similar_pairs, embed_samples = _embedding_similarity_ratio(submission, peer)
 
     hash_score = max(upload_j, repo_j, chunk_j)
-    combined = max(hash_score, embed_ratio)
+    detected_threshold = _threshold("PLAGIARISM_DETECTED_THRESHOLD", 0.25)
+    high_threshold = _threshold("PLAGIARISM_HIGH_SIMILARITY_THRESHOLD", 0.45)
+    min_matches = int(getattr(settings, "PLAGIARISM_MIN_EXACT_MATCHES", 3))
+    exact_overlaps = repo_overlap + chunk_hash_overlap + upload_overlap
+
+    # Embedding similarity only contributes when multiple chunks align — avoids false
+    # positives from a single coincidentally similar vector pair.
+    embed_score = embed_ratio if similar_pairs >= min_matches else 0.0
+    combined = max(hash_score, embed_score)
     if identical_repo:
         combined = 1.0
 
@@ -265,14 +273,10 @@ def _compare_pair(submission: Submission, peer: Submission, fp_a: _Fingerprints,
             }
         )
 
-    detected_threshold = _threshold("PLAGIARISM_DETECTED_THRESHOLD", 0.25)
-    high_threshold = _threshold("PLAGIARISM_HIGH_SIMILARITY_THRESHOLD", 0.45)
-    min_matches = int(getattr(settings, "PLAGIARISM_MIN_EXACT_MATCHES", 3))
-
     flagged = (
         identical_repo
         or combined >= high_threshold
-        or (hash_score >= detected_threshold and (repo_overlap + chunk_hash_overlap + upload_overlap) >= min_matches)
+        or (hash_score >= detected_threshold and exact_overlaps >= min_matches)
         or (embed_ratio >= detected_threshold and similar_pairs >= min_matches)
     )
 

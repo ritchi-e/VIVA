@@ -10,6 +10,7 @@ import { ProgressPanel } from '@/components/ui/Spinner'
 import { ErrorState } from '@/components/layout/StateViews'
 import { PreparingVivaOverlay } from '@/components/viva/PreparingVivaOverlay'
 import { getApiErrorMessage } from '@/lib/api'
+import { formatSubmissionProcessingError, formatVivaErrorMessage } from '@/lib/userErrors'
 import { PLATFORM_PROGRESS, SUBMISSION_STAGE_COPY } from '@/lib/progressCopy'
 
 const GITHUB_URL_RE = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/?$/
@@ -108,7 +109,7 @@ export function StudentAssignmentDetailPage() {
         return
       }
       if (response.data.state === 'FAILED') {
-        setError(response.data.error_message || 'Preparing your viva did not complete. Please try again.')
+        setError(formatVivaErrorMessage(response.data.error_message))
         return
       }
       navigate(`/student/viva/${sessionId}`)
@@ -170,6 +171,11 @@ export function StudentAssignmentDetailPage() {
                 </Link>
               </div>
             </div>
+            {latestSubmission.status === 'failed' && formatSubmissionProcessingError(latestSubmission.processing_error) ? (
+              <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {formatSubmissionProcessingError(latestSubmission.processing_error)}
+              </p>
+            ) : null}
             {processing ? (
               <div className="rounded-xl border border-teal-100 bg-teal-50/70 px-4 py-3">
                 <p className="font-display text-sm font-semibold text-teal-950">{stageCopy.title}</p>

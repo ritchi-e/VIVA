@@ -8,6 +8,7 @@ import { ProgressPanel } from '@/components/ui/Spinner'
 import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
 import { formatDate, formatScore } from '@/lib/utils'
+import { formatVivaErrorMessage } from '@/lib/userErrors'
 
 export function VivaSessionDetailPage() {
   const { id = '' } = useParams()
@@ -60,7 +61,9 @@ export function VivaSessionDetailPage() {
               </Badge>
             ) : null}
           </p>
-          {s.error_message ? <p className="text-red-600 sm:col-span-2">{s.error_message}</p> : null}
+          {s.error_message ? (
+            <p className="text-red-600 sm:col-span-2">{formatVivaErrorMessage(s.error_message)}</p>
+          ) : null}
         </CardBody>
       </Card>
 

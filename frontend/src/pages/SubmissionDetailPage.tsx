@@ -13,6 +13,7 @@ import { RepositorySummary } from '@/components/submissions/RepositorySummary'
 import { AssignmentMismatchBanner } from '@/components/submissions/AssignmentMismatchBanner'
 import { SubmissionWorkViewer } from '@/components/submissions/SubmissionWorkViewer'
 import type { Assessment } from '@/types'
+import { formatSubmissionProcessingError } from '@/lib/userErrors'
 import { formatDate } from '@/lib/utils'
 
 export function SubmissionDetailPage() {
@@ -63,8 +64,10 @@ export function SubmissionDetailPage() {
           <p>
             Status: <Badge>{submission.data.status}</Badge>
           </p>
-          {submission.data.processing_error ? (
-            <p className="text-red-600 sm:col-span-2">{submission.data.processing_error}</p>
+          {formatSubmissionProcessingError(submission.data.processing_error) ? (
+            <p className="text-red-600 sm:col-span-2">
+              {formatSubmissionProcessingError(submission.data.processing_error)}
+            </p>
           ) : null}
         </CardBody>
       </Card>

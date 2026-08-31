@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type MouseEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { api, getOrganizationId, getStoredTokens, getVivaWebSocketUrl, vivaApi } from '@/lib/api'
-import axios from 'axios'
+import { api, getApiErrorMessage, getOrganizationId, getStoredTokens, getVivaWebSocketUrl, vivaApi } from '@/lib/api'
+import { formatVivaErrorMessage } from '@/lib/userErrors'
 import {
   EXAMINER_VOICE_OPTIONS,
   previewExaminerVoice,
@@ -228,7 +228,7 @@ export function VivaInterface({
         }
       } catch (err) {
         submittingRef.current = false
-        setError(err instanceof Error ? err.message : 'Failed to submit answer')
+        setError(getApiErrorMessage(err, 'viva.answer'))
         setPhase('error')
       }
     },
@@ -260,7 +260,7 @@ export function VivaInterface({
     } catch (err) {
       session?.destroy()
       submittingRef.current = false
-      setError(err instanceof Error ? err.message : 'Could not transcribe your answer')
+      setError(getApiErrorMessage(err, 'viva.stt'))
       setPhase('error')
     }
   }, [clearListenTimers, sessionId, submitAnswer])
@@ -348,7 +348,7 @@ export function VivaInterface({
         if (completeRef.current) return
         await startListening()
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Examiner voice failed')
+        setError(getApiErrorMessage(err, 'viva.tts'))
         setPhase('error')
       } finally {
         if (flow.id === q.id) flow.inFlight = false
@@ -538,13 +538,7 @@ export function VivaInterface({
       await exitFullscreen()
     } catch (err) {
       shouldReconnect.current = true
-      const message =
-        axios.isAxiosError(err) && err.response?.status === 404
-          ? 'Finish viva is unavailable — restart the backend (docker compose restart backend) and try again.'
-          : err instanceof Error
-            ? err.message
-            : 'Failed to finish viva'
-      setError(message)
+      setError(getApiErrorMessage(err, 'viva.finish'))
       setPhase('error')
     } finally {
       setFinishing(false)
@@ -629,7 +623,7 @@ export function VivaInterface({
           stopAudio()
           void exitFullscreen()
         } else if (msg.type === 'error') {
-          setError(msg.message)
+          setError(formatVivaErrorMessage(msg.message))
           setPhase('error')
           submittingRef.current = false
         } else if ((msg as { type: string }).type === 'status') {

@@ -1,4 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
+import { formatVivaErrorMessage, logTechnicalError } from './userErrors'
 import type {
   Assessment,
   Assignment,
@@ -259,7 +260,8 @@ export const vivaApi = {
     const sessionId = created.data.id
     const prepared = await api.post<VivaSession>(`/viva/sessions/${sessionId}/prepare/`, {}, { timeout: 180_000 })
     if (prepared.data.state === 'FAILED') {
-      throw new Error(prepared.data.error_message || 'Failed to prepare viva questions.')
+      logTechnicalError('viva.prepare', prepared.data.error_message)
+      throw new Error(formatVivaErrorMessage(prepared.data.error_message))
     }
     const started = await api.post<VivaSession>(`/viva/sessions/${sessionId}/start/`, {}, { timeout: 60_000 })
     return started
@@ -390,14 +392,4 @@ export function getVivaWebSocketUrl(sessionId: string, accessToken: string) {
   return url.toString()
 }
 
-export function getApiErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    const data = error.response?.data as { message?: string; detail?: string } | undefined
-    if (data?.message) return data.message
-    if (data?.detail) return String(data.detail)
-    if (error.response?.status === 404) return 'Resource not found.'
-    if (error.response?.status === 403) return 'You do not have permission to perform this action.'
-  }
-  if (error instanceof Error) return error.message
-  return 'Something went wrong. Please try again.'
-}
+export { getApiErrorMessage, formatSubmissionProcessingError, formatVivaErrorMessage } from './userErrors'

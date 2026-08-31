@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { assignmentsApi, submissionsApi, vivaApi, slotsApi, getApiErrorMessage, type SlotBooking } from '@/lib/api'
+import { formatVivaErrorMessage } from '@/lib/userErrors'
 import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
@@ -40,7 +41,7 @@ export function StudentDashboardPage() {
         return
       }
       if (response.data.state === 'FAILED') {
-        setVivaError(response.data.error_message || 'Preparing viva failed. Please try again.')
+        setVivaError(formatVivaErrorMessage(response.data.error_message))
         return
       }
       navigate(`/student/viva/${sessionId}`)

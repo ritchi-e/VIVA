@@ -1,4 +1,5 @@
 import type { Submission } from '@/types'
+import { formatRepositoryError, formatSubmissionProcessingError } from '@/lib/userErrors'
 
 export function RepositorySummary({
   submission,
@@ -57,9 +58,10 @@ export function RepositorySummary({
           Skipped examples: {skipped.slice(0, 6).map((f) => f.path).join(', ')}
         </p>
       ) : null}
-      {repo?.error_message || submission.processing_error ? (
-        <p className="text-sm text-red-600">{repo?.error_message || submission.processing_error}</p>
-      ) : null}
+      {(() => {
+        const err = formatRepositoryError(repo?.error_message) ?? formatSubmissionProcessingError(submission.processing_error)
+        return err ? <p className="text-sm text-red-600">{err}</p> : null
+      })()}
     </div>
   )
 }

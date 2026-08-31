@@ -5,6 +5,7 @@ import { useAsync } from '@/hooks/useAsync'
 import { ErrorState } from '@/components/layout/StateViews'
 import { VivaInterface } from '@/components/viva/VivaInterface'
 import { PreparingVivaOverlay } from '@/components/viva/PreparingVivaOverlay'
+import { formatVivaErrorMessage } from '@/lib/userErrors'
 
 export function StudentVivaPage() {
   const { id = '' } = useParams()
@@ -46,7 +47,7 @@ export function StudentVivaPage() {
   if (data.state === 'FAILED') {
     return (
       <ErrorState
-        message={data.error_message || 'This viva session failed while preparing questions.'}
+        message={formatVivaErrorMessage(data.error_message)}
         onRetry={reload}
       />
     )

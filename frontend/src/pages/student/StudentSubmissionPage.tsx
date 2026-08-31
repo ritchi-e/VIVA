@@ -8,6 +8,7 @@ import { ProgressPanel } from '@/components/ui/Spinner'
 import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
 import { RepositorySummary } from '@/components/submissions/RepositorySummary'
+import { formatSubmissionProcessingError } from '@/lib/userErrors'
 import { formatDate } from '@/lib/utils'
 
 export function StudentSubmissionPage() {
@@ -26,6 +27,7 @@ export function StudentSubmissionPage() {
   if (error || !data) return <ErrorState message={error ?? 'Not found'} onRetry={reload} />
 
   const relatedSessions = (sessions.data || []).filter((s) => s.submission === data.id)
+  const processingError = formatSubmissionProcessingError(data.processing_error)
 
   return (
     <div>
@@ -44,7 +46,7 @@ export function StudentSubmissionPage() {
           <p>Submitted: {formatDate(data.created_at)}</p>
           {data.processed_at ? <p>Processed: {formatDate(data.processed_at)}</p> : null}
           {data.github_url || data.repository ? <RepositorySummary submission={data} /> : null}
-          {data.processing_error ? <p className="text-red-600">{data.processing_error}</p> : null}
+          {processingError ? <p className="text-red-600">{processingError}</p> : null}
           <Link to={`/student/assignments/${data.assignment}`} className="inline-block text-blue-700 hover:underline">
             Back to assignment
           </Link>

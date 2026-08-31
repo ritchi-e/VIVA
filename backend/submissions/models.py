@@ -319,4 +319,9 @@ class PlagiarismReport(UUIDModel, SoftDeleteModel):
     matches = models.JSONField(default=list, blank=True)
 
     class Meta:
-        indexes = [models.Index(fields=["plagiarism_detected", "checked_at"])]
+        indexes = [
+            models.Index(
+                fields=["plagiarism_detected", "checked_at"],
+                name="submissions_plagia_0d4f21_idx",
+            )
+        ]

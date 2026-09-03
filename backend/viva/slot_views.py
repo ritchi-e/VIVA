@@ -208,7 +208,7 @@ class VivaSlotViewSet(TenantContextMixin, viewsets.GenericViewSet):
             student=request.user,
             status__in=[VivaSlotBooking.Status.BOOKED, VivaSlotBooking.Status.STARTED],
             is_deleted=False,
-        ).select_related("assignment", "student")
+        ).select_related("assignment", "student", "viva_session")
         return Response(VivaSlotBookingSerializer(bookings, many=True).data)
 
     @action(detail=False, methods=["get"], url_path="for-assignment")
@@ -226,7 +226,7 @@ class VivaSlotViewSet(TenantContextMixin, viewsets.GenericViewSet):
 
         bookings = (
             VivaSlotBooking.objects.filter(assignment=assignment, is_deleted=False)
-            .select_related("student", "assignment")
+            .select_related("student", "assignment", "viva_session")
             .order_by("slot_start", "student__email")
         )
         return Response(VivaSlotBookingSerializer(bookings, many=True).data)

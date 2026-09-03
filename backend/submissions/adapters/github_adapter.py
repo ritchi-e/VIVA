@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 from submissions.adapters.base import BaseSubmissionAdapter, ExtractedDocument
 from submissions.repository.urls import parse_github_url
+from submissions.text_sanitize import sanitize_json, sanitize_text
 
 READ_EXTENSIONS = {".md", ".txt", ".py", ".java", ".c", ".cpp", ".h", ".js", ".ts", ".json", ".yaml", ".yml", ".rst"}
 
@@ -50,15 +51,19 @@ class GithubAdapter(BaseSubmissionAdapter):
                         files_meta.append({"path": rel, "skipped": True})
                         continue
                     try:
-                        with open(path, encoding="utf-8", errors="replace") as fh:
-                            content = fh.read(200_000)
+                        with open(path, "rb") as fh:
+                            raw = fh.read(200_000)
                     except OSError:
                         continue
+                    if b"\x00" in raw:
+                        files_meta.append({"path": rel, "skipped": True})
+                        continue
+                    content = sanitize_text(raw.decode("utf-8", errors="replace"))
                     texts.append(f"--- {rel} ---\n{content}")
                     files_meta.append({"path": rel, "chars": len(content)})
             return ExtractedDocument(
-                text="\n\n".join(texts),
-                structure={"repo": url, "files": files_meta},
+                text=sanitize_text("\n\n".join(texts)),
+                structure=sanitize_json({"repo": url, "files": files_meta}),
                 source_ref=url,
             )
         finally:

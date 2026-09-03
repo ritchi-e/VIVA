@@ -111,11 +111,12 @@ export async function waitUntilSpeechIdle(
   }
 }
 
-async function playAudioBlob(blob: Blob): Promise<void> {
-  stopExaminerSpeech()
+async function playAudioBlob(blob: Blob, existing?: HTMLAudioElement | null): Promise<void> {
+  if (!existing) stopExaminerSpeech()
   const objectUrl = URL.createObjectURL(blob)
   activeObjectUrl = objectUrl
-  const audio = new Audio(objectUrl)
+  const audio = existing ?? new Audio()
+  audio.src = objectUrl
   activeAudio = audio
 
   await new Promise<void>((resolve, reject) => {
@@ -142,14 +143,33 @@ async function playAudioBlob(blob: Blob): Promise<void> {
   })
 }
 
+/** Tiny WAV so browsers treat later TTS playback as a continued user-gesture session. */
+const SILENT_WAV =
+  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
+
+async function unlockPlayback(): Promise<HTMLAudioElement> {
+  await primeSpeechSynthesis()
+  const audio = new Audio(SILENT_WAV)
+  audio.volume = 0.01
+  try {
+    await audio.play()
+  } catch {
+    /* some browsers still allow later play() after this attempt */
+  }
+  audio.pause()
+  audio.volume = 1
+  return audio
+}
+
 async function speakViaRumik(
   sessionId: string,
   text: string,
   speaker: ExaminerVoiceChoice,
+  options?: { preview?: boolean; audio?: HTMLAudioElement | null },
 ): Promise<void> {
   const response = await api.post(
     `/viva/sessions/${sessionId}/speak/`,
-    { text, speaker },
+    { text, speaker, preview: Boolean(options?.preview) },
     {
       responseType: 'blob',
       timeout: 60_000,
@@ -158,13 +178,20 @@ async function speakViaRumik(
   const contentType = String(response.headers['content-type'] || '')
   if (contentType.includes('application/json')) {
     const message = await (response.data as Blob).text()
-    throw new Error(message || 'TTS request failed')
+    let detail = message || 'TTS request failed'
+    try {
+      const parsed = JSON.parse(message) as { detail?: string; message?: string }
+      detail = parsed.detail || parsed.message || detail
+    } catch {
+      /* keep raw text */
+    }
+    throw new Error(detail)
   }
   const blob = response.data as Blob
   if (!blob || blob.size < 100) {
     throw new Error('TTS returned empty audio')
   }
-  await playAudioBlob(blob)
+  await playAudioBlob(blob, options?.audio)
 }
 
 /** Quiet unlock after a user gesture (needed for autoplay policies). */
@@ -187,11 +214,13 @@ export async function previewExaminerVoice(
   sessionId: string,
   speaker: ExaminerVoiceChoice,
 ): Promise<void> {
+  stopExaminerSpeech()
   const sample =
     speaker === 'siya'
       ? 'Hello. I will be your examiner today.'
       : 'Hello. I will be your examiner for this viva.'
-  await speakViaRumik(sessionId, sample, speaker)
+  const audio = await unlockPlayback()
+  await speakViaRumik(sessionId, sample, speaker, { preview: true, audio })
 }
 
 export async function speakExaminer(

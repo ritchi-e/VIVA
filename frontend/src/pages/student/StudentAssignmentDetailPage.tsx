@@ -8,9 +8,8 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { ProgressPanel } from '@/components/ui/Spinner'
 import { ErrorState } from '@/components/layout/StateViews'
-import { PreparingVivaOverlay } from '@/components/viva/PreparingVivaOverlay'
 import { getApiErrorMessage } from '@/lib/api'
-import { formatSubmissionProcessingError, formatVivaErrorMessage } from '@/lib/userErrors'
+import { formatSubmissionProcessingError } from '@/lib/userErrors'
 import { PLATFORM_PROGRESS, SUBMISSION_STAGE_COPY } from '@/lib/progressCopy'
 
 const GITHUB_URL_RE = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/?$/
@@ -25,7 +24,6 @@ export function StudentAssignmentDetailPage() {
   const [githubUrl, setGithubUrl] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -84,47 +82,9 @@ export function StudentAssignmentDetailPage() {
     }
   }
 
-  const startViva = async () => {
-    if (!latestSubmission) {
-      setError('Upload a submission before starting the viva.')
-      return
-    }
-    if (latestSubmission.status !== 'ready') {
-      setError('Wait until processing is complete before starting the viva.')
-      await submissions.reload()
-      return
-    }
-    setStarting(true)
-    setError(null)
-    setMessage(null)
-    try {
-      const response = await vivaApi.start({
-        assignment: id,
-        submission: latestSubmission.id,
-        mode: 'text',
-      })
-      const sessionId = response.data?.id ? String(response.data.id) : ''
-      if (!sessionId || sessionId === 'undefined') {
-        setError('We could not open the viva room. Please try starting again.')
-        return
-      }
-      if (response.data.state === 'FAILED') {
-        setError(formatVivaErrorMessage(response.data.error_message))
-        return
-      }
-      navigate(`/student/viva/${sessionId}`)
-    } catch (err) {
-      setError(getApiErrorMessage(err))
-    } finally {
-      setStarting(false)
-      setMessage(null)
-    }
-  }
-
   return (
     <div>
-      {starting ? <PreparingVivaOverlay /> : null}
-      <PageHeader title={assignment.data.title} description="Submit work and start your viva when ready." />
+      <PageHeader title={assignment.data.title} description="Submit work, then book a viva slot when processing is complete." />
       <Card className="mb-6">
         <CardBody className="space-y-2 text-sm text-slate-700">
           <p>{assignment.data.description}</p>
@@ -196,12 +156,14 @@ export function StudentAssignmentDetailPage() {
                     {s.state} · {s.questions_asked}/{s.question_budget}
                   </span>
                   <div className="flex gap-3">
-                    <Link to={`/student/viva/${s.id}`} className="text-teal-800 hover:underline">
-                      Open
-                    </Link>
+                    {s.state === 'IN_PROGRESS' ? (
+                      <Link to={`/student/viva/${s.id}`} className="text-teal-800 hover:underline">
+                        Rejoin
+                      </Link>
+                    ) : null}
                     {['COMPLETED', 'REVIEW_REQUIRED'].includes(s.state) ? (
                       <Link to={`/student/results/${s.id}`} className="text-teal-800 hover:underline">
-                        Results
+                        View analysis
                       </Link>
                     ) : null}
                   </div>
@@ -212,16 +174,9 @@ export function StudentAssignmentDetailPage() {
         </Card>
       ) : null}
       {error ? <p className="mb-3 text-sm text-red-600">{error}</p> : null}
-      <div className="flex gap-3">
-        <Button onClick={startViva} loading={starting} disabled={!latestSubmission || starting || processing}>
-          Start viva session
-        </Button>
-        {latestSubmission && latestSubmission.status === 'ready' && (
-          <Button variant="secondary" onClick={() => navigate(`/student/assignments/${id}/book-slot`)}>
-            Book viva slot
-          </Button>
-        )}
-      </div>
+      {latestSubmission?.status === 'ready' ? (
+        <Button onClick={() => navigate(`/student/assignments/${id}/book-slot`)}>Book viva slot</Button>
+      ) : null}
     </div>
   )
 }

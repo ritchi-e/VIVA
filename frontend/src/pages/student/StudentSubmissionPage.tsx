@@ -62,14 +62,18 @@ export function StudentSubmissionPage() {
             <ul className="space-y-2 text-sm">
               {relatedSessions.map((s) => (
                 <li key={s.id} className="flex items-center justify-between gap-3">
-                  <Link to={`/student/viva/${s.id}`} className="text-blue-700 hover:underline">
+                  <span>
                     Session · {s.questions_asked}/{s.question_budget}
-                  </Link>
+                  </span>
                   <div className="flex items-center gap-2">
                     <Badge>{s.state}</Badge>
                     {['COMPLETED', 'REVIEW_REQUIRED'].includes(s.state) ? (
                       <Link to={`/student/results/${s.id}`} className="text-xs text-blue-700 hover:underline">
-                        Results
+                        Analysis
+                      </Link>
+                    ) : s.state === 'IN_PROGRESS' ? (
+                      <Link to={`/student/viva/${s.id}`} className="text-xs text-blue-700 hover:underline">
+                        Rejoin
                       </Link>
                     ) : null}
                   </div>

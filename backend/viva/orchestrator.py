@@ -48,7 +48,11 @@ class VivaOrchestrator:
         if new_state not in allowed and new_state != current:
             raise ValueError(f"Invalid transition {current} -> {new_state}")
         self.session.state = new_state
-        self.session.save(update_fields=["state", "updated_at"])
+        # Persist error_message whenever present so FAILED reasons survive the state save.
+        fields = ["state", "updated_at"]
+        if self.session.error_message is not None:
+            fields.append("error_message")
+        self.session.save(update_fields=fields)
 
     def prepare(self) -> VivaSession:
         from django.db import transaction
@@ -59,9 +63,14 @@ class VivaOrchestrator:
             VivaSession.State.IN_PROGRESS,
             VivaSession.State.COMPLETED,
             VivaSession.State.REVIEW_REQUIRED,
-            VivaSession.State.FAILED,
         ):
             return self.session
+
+        # Allow a fresh prepare after a previous AI failure within the same session.
+        if self.session.state == VivaSession.State.FAILED:
+            self.session.state = VivaSession.State.CREATED
+            self.session.error_message = ""
+            self.session.save(update_fields=["state", "error_message", "updated_at"])
 
         if self.session.state == VivaSession.State.PREPARING:
             import time
@@ -167,7 +176,8 @@ class VivaOrchestrator:
         if self.session.state != VivaSession.State.READY:
             raise ValueError(f"Cannot start viva in state {self.session.state}")
         self.session.started_at = timezone.now()
-        self._transition(VivaSession.State.IN_PROGRESS)
+        self.session.state = VivaSession.State.IN_PROGRESS
+        self.session.save(update_fields=["state", "started_at", "updated_at"])
         if not self.session.questions.exists():
             self._ask_next_question()
         return self.session

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from submissions.repository.classify import classify_file, is_probably_binary
 from submissions.repository.ignore import matches_gitignore, parse_gitignore, should_deny_path
 from submissions.repository.limits import RepoLimitError, get_repo_limits
+from submissions.text_sanitize import sanitize_text
 
 
 @dataclass
@@ -117,7 +118,7 @@ def extract_zip_inventory(archive: bytes) -> list[ExtractedRepoFile]:
                 ExtractedRepoFile(path, "", info.file_size, "", category, language, False, "unreadable")
             )
             continue
-        if is_probably_binary(raw):
+        if is_probably_binary(raw) or b"\x00" in raw:
             files.append(
                 ExtractedRepoFile(path, "", len(raw), "", "binary", language, False, "binary")
             )
@@ -129,7 +130,7 @@ def extract_zip_inventory(archive: bytes) -> list[ExtractedRepoFile]:
             )
             continue
 
-        text = raw.decode("utf-8", errors="replace")
+        text = sanitize_text(raw.decode("utf-8", errors="replace"))
         if extracted_chars + len(text) > limits.extracted_chars:
             remaining = limits.extracted_chars - extracted_chars
             if remaining < 200:

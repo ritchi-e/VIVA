@@ -51,3 +51,15 @@ class ExtractZipTests(SimpleTestCase):
         self.assertTrue(any(reason == "ignored_directory" for reason in skipped_reasons.values()))
         self.assertTrue(any("env" in path or reason == "secret_or_local_file" for path, reason in skipped_reasons.items()))
         self.assertFalse(any(".." in item.path and item.indexed for item in files))
+
+    @override_settings(MAX_REPO_FILES=50, MAX_REPO_FILE_BYTES=50_000, MAX_EXTRACTED_CHARS=200_000)
+    def test_skips_files_containing_nul_bytes(self):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as zf:
+            zf.writestr("repo-sha/ok.py", "def ok():\n    return 1\n")
+            zf.writestr("repo-sha/bad.py", b"def bad():\n    return '\x00'\n")
+        files = extract_zip_inventory(buffer.getvalue())
+        indexed = {item.path for item in files if item.indexed}
+        skipped = {item.path: item.skip_reason for item in files if not item.indexed}
+        self.assertIn("ok.py", indexed)
+        self.assertEqual(skipped.get("bad.py"), "binary")

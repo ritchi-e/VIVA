@@ -21,6 +21,7 @@ from submissions.repository.candidates import generate_question_candidates
 from submissions.repository.ingest import create_repository_chunks, ingest_github_repository
 from submissions.repository.limits import static_ingestion_enabled
 from submissions.repository.urls import GithubUrlError, parse_github_url
+from submissions.text_sanitize import sanitize_json, sanitize_text
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ CHUNK_OVERLAP = 150
 
 
 def _chunk_text(text: str) -> list[str]:
-    text = re.sub(r"\s+", " ", text).strip()
+    text = sanitize_text(re.sub(r"\s+", " ", text).strip())
     if not text:
         return []
     chunks = []
@@ -63,6 +64,17 @@ def _set_stage(submission: Submission, stage: str) -> None:
     submission.save(update_fields=["processing_stage", "updated_at"])
 
 
+def _user_facing_pipeline_error(exc: BaseException) -> str:
+    raw = sanitize_text(str(exc))[:4000]
+    lower = raw.lower()
+    if "0x00" in lower or "contain nul" in lower:
+        return (
+            "This file could not be processed because it contains unreadable data. "
+            "Try a different PDF export or a cleaner GitHub repo."
+        )
+    return raw
+
+
 def validate_submission(submission: Submission) -> None:
     assignment = submission.assignment
     if not submission.files.exists() and not submission.github_url:
@@ -88,19 +100,34 @@ def extract_submission(submission: Submission) -> list[tuple[SubmissionFile | No
         from submissions.adapters.github_adapter import GithubAdapter
 
         doc = GithubAdapter().extract_from_url(submission.github_url)
-        extracted.append((None, doc.text, doc.structure))
+        extracted.append((None, sanitize_text(doc.text), sanitize_json(doc.structure)))
     for sf in submission.files.all():
         adapter = get_adapter(sf.file_type)
         if not adapter:
             logger.warning("No adapter for file type %s", sf.file_type)
             continue
-        data = download_bytes(sf.storage_key)
-        doc = adapter.extract(data, sf.original_filename)
-        sf.extracted_text = doc.text[:500_000]
-        sf.structure = doc.structure
+        try:
+            data = download_bytes(sf.storage_key)
+        except Exception as exc:
+            logger.exception("Storage download failed for submission file %s", sf.id)
+            raise ValueError("We could not load the uploaded file. Please try submitting again.") from exc
+        if not data:
+            raise ValueError("The uploaded file was empty. Please try submitting again.")
+        try:
+            doc = adapter.extract(data, sf.original_filename)
+        except ValueError:
+            raise
+        except Exception as exc:
+            logger.exception("Extract failed for %s (%s)", sf.original_filename, sf.file_type)
+            kind = (sf.file_type or "file").upper()
+            raise ValueError(f"This {kind} could not be processed. Try a different export or file.") from exc
+        text = sanitize_text(doc.text[:500_000])
+        structure = sanitize_json(doc.structure)
+        sf.extracted_text = text
+        sf.structure = structure
         sf.checksum = hashlib.sha256(data).hexdigest()
         sf.save(update_fields=["extracted_text", "structure", "checksum", "updated_at"])
-        extracted.append((sf, doc.text, doc.structure))
+        extracted.append((sf, text, structure))
     return extracted
 
 
@@ -117,7 +144,7 @@ def _file_chunks(submission: Submission, extracted: Iterable[tuple[SubmissionFil
                     chunk_index=index,
                     content=piece,
                     token_count=len(piece.split()),
-                    metadata={"structure": structure, "path": sf.original_filename if sf else ""},
+                    metadata=sanitize_json({"structure": structure, "path": sf.original_filename if sf else ""}),
                     source_ref=sf.original_filename if sf else submission.github_url,
                     path=sf.original_filename if sf else "",
                     content_hash=digest,
@@ -243,7 +270,7 @@ def run_submission_pipeline(submission_id: str) -> None:
                     "It does not verify that the code executes correctly."
                 ),
             }
-        submission.knowledge_representation = knowledge
+        submission.knowledge_representation = sanitize_json(knowledge)
         assess_assignment_alignment(submission, extracted)
         submission.status = Submission.Status.READY
         submission.processing_stage = Submission.ProcessingStage.COMPLETE
@@ -268,6 +295,6 @@ def run_submission_pipeline(submission_id: str) -> None:
         INGESTION_FAILURES.labels(reason=exc.__class__.__name__).inc()
         submission.status = Submission.Status.FAILED
         submission.processing_stage = Submission.ProcessingStage.FAILED
-        submission.processing_error = str(exc)
+        submission.processing_error = _user_facing_pipeline_error(exc)
         submission.save(update_fields=["status", "processing_stage", "processing_error", "updated_at"])
         raise

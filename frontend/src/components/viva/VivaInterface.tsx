@@ -349,7 +349,9 @@ export function VivaInterface({
         await startListening()
       } catch (err) {
         setError(getApiErrorMessage(err, 'viva.tts'))
-        setPhase('error')
+        if (completeRef.current) return
+        // TTS outage must not abort the viva — continue with the on-screen question.
+        await startListening()
       } finally {
         if (flow.id === q.id) flow.inFlight = false
       }
@@ -727,7 +729,7 @@ export function VivaInterface({
   const statusDetail = finishing
     ? PLATFORM_PROGRESS.finishingViva.detail
     : showBeginButton
-      ? 'Choose a voice, then begin. This viva is live-monitored. Stay in this window; leaving for more than 5 seconds ends the session and notifies your instructor. Camera access is required.'
+      ? 'Choose a voice, then begin. Stay in this window — leaving for more than 5 seconds ends the session. Camera access is required.'
       : rotating ?? copy.detail
 
   const preventCopy = useCallback((event: ClipboardEvent | MouseEvent | DragEvent) => {
@@ -744,10 +746,10 @@ export function VivaInterface({
       onContextMenu={preventCopy}
       onDragStart={preventCopy}
       className={cn(
-        'relative overflow-hidden bg-[radial-gradient(ellipse_at_top,_#0f2f2c_0%,_#071018_45%,_#05080c_100%)] text-white',
+        'relative bg-[radial-gradient(ellipse_at_top,_#0f2f2c_0%,_#071018_45%,_#05080c_100%)] text-white',
         immersive
-          ? 'fixed inset-0 z-[200] min-h-dvh w-full'
-          : 'min-h-[calc(100vh-8rem)] rounded-3xl shadow-2xl',
+          ? 'fixed inset-0 z-[200] min-h-dvh w-full overflow-y-auto overscroll-contain'
+          : 'min-h-[calc(100vh-8rem)] overflow-hidden rounded-3xl shadow-2xl',
       )}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -756,7 +758,7 @@ export function VivaInterface({
         <div className="absolute left-1/2 top-1/3 h-56 w-56 -translate-x-1/2 rounded-full bg-emerald-400/8 blur-3xl" />
       </div>
 
-      <div className="relative z-10 flex min-h-dvh flex-col items-center px-4 py-8 sm:px-8">
+      <div className="relative z-10 flex min-h-dvh flex-col items-center px-4 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-8 sm:py-8">
         {awaySeconds != null && phase !== 'terminated' ? (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 px-6">
             <div className="max-w-md rounded-3xl border border-amber-200/30 bg-[#1a140c] p-8 text-center shadow-2xl">
@@ -771,7 +773,7 @@ export function VivaInterface({
             </div>
           </div>
         ) : null}
-        <div className="mb-8 flex w-full max-w-xl items-center justify-between">
+        <div className="mb-4 flex w-full max-w-xl items-center justify-between sm:mb-8">
           <p className="font-display text-sm font-semibold tracking-tight text-white/80">Mokhik</p>
           {audioStarted && !showBeginButton && phase !== 'complete' && phase !== 'terminated' ? (
             <button
@@ -794,7 +796,7 @@ export function VivaInterface({
           <span>{progress}%</span>
         </div>
 
-        <div className="mb-8 w-full max-w-xl">
+        <div className="mb-5 w-full max-w-xl sm:mb-8">
           <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
             <div
               className="h-full rounded-full bg-gradient-to-r from-teal-400 via-cyan-400 to-emerald-400 transition-all duration-700"
@@ -805,19 +807,19 @@ export function VivaInterface({
 
         <VivaOrb phase={activePhase} />
 
-        <div className="mt-7 max-w-lg text-center animate-viva-fade-up" key={statusTitle}>
-          <p className="font-display text-xl font-semibold tracking-tight text-white sm:text-2xl">
+        <div className="mt-4 max-w-lg px-1 text-center animate-viva-fade-up sm:mt-7" key={statusTitle}>
+          <p className="font-display text-lg font-semibold tracking-tight text-white sm:text-2xl">
             {statusTitle}
           </p>
           {statusDetail ? (
-            <p className="mt-2 text-sm leading-relaxed text-white/55 transition-opacity duration-500">
+            <p className="mt-2 text-xs leading-relaxed text-white/55 sm:text-sm transition-opacity duration-500">
               {statusDetail}
             </p>
           ) : null}
         </div>
 
         {showBeginButton ? (
-          <div className="mt-10 flex w-full max-w-lg flex-col items-stretch gap-5 animate-viva-fade-up">
+          <div className="mt-5 flex w-full max-w-lg flex-col items-stretch gap-4 animate-viva-fade-up sm:mt-10 sm:gap-5">
             <div>
               <p className="mb-3 text-center text-xs font-medium uppercase tracking-[0.14em] text-white/45">
                 Examiner voice
@@ -850,17 +852,24 @@ export function VivaInterface({
                 type="button"
                 disabled={previewingVoice != null}
                 onClick={() => {
+                  setError(null)
                   setPreviewingVoice(selectedVoice)
-                  void previewExaminerVoice(sessionId, selectedVoice).finally(() =>
-                    setPreviewingVoice(null),
-                  )
+                  void (async () => {
+                    try {
+                      await previewExaminerVoice(sessionId, selectedVoice)
+                    } catch (err) {
+                      setError(getApiErrorMessage(err, 'viva.tts'))
+                    } finally {
+                      setPreviewingVoice(null)
+                    }
+                  })()
                 }}
                 className="mt-3 w-full rounded-full border border-white/12 bg-white/[0.04] py-2.5 text-xs font-medium text-white/65 hover:bg-white/[0.08] disabled:opacity-50"
               >
                 {previewingVoice === selectedVoice ? 'Playing a short sample…' : 'Preview voice'}
               </button>
             </div>
-            <div className="rounded-2xl border border-amber-200/20 bg-amber-500/10 px-4 py-3 text-left text-xs leading-relaxed text-amber-50/85">
+            <div className="hidden rounded-2xl border border-amber-200/20 bg-amber-500/10 px-4 py-3 text-left text-xs leading-relaxed text-amber-50/85 sm:block">
               This viva is live-monitored. Stay in this window. If you leave for more than 5 seconds,
               the session ends and your instructor is notified. Camera access is required.
             </div>
@@ -890,7 +899,7 @@ export function VivaInterface({
               From your submission{excerpt.source_ref ? ` · ${excerpt.source_ref}` : ''}
             </p>
             <pre
-              className="mt-3 max-h-40 overflow-y-auto whitespace-pre-wrap font-sans text-sm leading-relaxed text-white/80 select-none"
+              className="mt-3 max-h-28 overflow-y-auto whitespace-pre-wrap font-sans text-sm leading-relaxed text-white/80 select-none sm:max-h-40"
               style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }}
               onCopy={preventCopy}
               onCut={preventCopy}

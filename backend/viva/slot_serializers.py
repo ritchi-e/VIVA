@@ -18,6 +18,7 @@ class VivaSlotBookingSerializer(serializers.ModelSerializer):
     student_email = serializers.EmailField(source="student.email", read_only=True)
     assignment_title = serializers.CharField(source="assignment.title", read_only=True)
     viva_session_id = serializers.UUIDField(read_only=True, allow_null=True)
+    viva_session_state = serializers.SerializerMethodField()
 
     class Meta:
         model = VivaSlotBooking
@@ -33,6 +34,7 @@ class VivaSlotBookingSerializer(serializers.ModelSerializer):
             "slot_end",
             "status",
             "viva_session_id",
+            "viva_session_state",
             "created_at",
         ]
         read_only_fields = [
@@ -44,8 +46,12 @@ class VivaSlotBookingSerializer(serializers.ModelSerializer):
             "slot_end",
             "status",
             "viva_session_id",
+            "viva_session_state",
             "created_at",
         ]
+
+    def get_viva_session_state(self, obj) -> str | None:
+        return obj.viva_session.state if obj.viva_session_id else None
 
 
 class BookSlotSerializer(serializers.Serializer):

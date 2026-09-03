@@ -24,6 +24,9 @@ class AssessmentViewSet(TenantContextMixin, viewsets.ReadOnlyModelViewSet):
             "submission__assignment",
             "viva_session",
         ).prefetch_related("criteria")
+        role = getattr(self.request.user, "active_role", None)
+        if role == "student":
+            qs = qs.filter(submission__student=self.request.user)
         submission = self.request.query_params.get("submission")
         if submission:
             qs = qs.filter(submission_id=submission)

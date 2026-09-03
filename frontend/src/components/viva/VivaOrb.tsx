@@ -68,7 +68,7 @@ export function VivaOrb({ phase, className }: VivaOrbProps) {
   return (
     <div
       className={cn(
-        'relative flex h-56 w-56 items-center justify-center sm:h-72 sm:w-72',
+        'relative flex h-36 w-36 items-center justify-center sm:h-56 sm:w-56 lg:h-72 lg:w-72',
         className,
       )}
     >
@@ -81,27 +81,27 @@ export function VivaOrb({ phase, className }: VivaOrbProps) {
       />
       <div
         className={cn(
-          'absolute h-44 w-44 rounded-full bg-gradient-to-tr opacity-50 blur-2xl sm:h-56 sm:w-56',
+          'absolute h-28 w-28 rounded-full bg-gradient-to-tr opacity-50 blur-2xl sm:h-44 sm:w-44 lg:h-56 lg:w-56',
           colors.ring,
           'animate-viva-orbit',
         )}
       />
       <div
         className={cn(
-          'absolute h-36 w-36 rounded-full bg-gradient-to-bl opacity-40 blur-xl sm:h-48 sm:w-48',
+          'absolute h-24 w-24 rounded-full bg-gradient-to-bl opacity-40 blur-xl sm:h-36 sm:w-36 lg:h-48 lg:w-48',
           colors.ring,
           'animate-viva-orbit-rev',
         )}
       />
       <div
         className={cn(
-          'relative z-10 flex h-28 w-28 items-center justify-center rounded-full border border-white/25 bg-white/10 shadow-[0_0_40px_rgba(15,118,110,0.35)] backdrop-blur-md sm:h-36 sm:w-36',
+          'relative z-10 flex h-20 w-20 items-center justify-center rounded-full border border-white/25 bg-white/10 shadow-[0_0_40px_rgba(15,118,110,0.35)] backdrop-blur-md sm:h-28 sm:w-28 lg:h-36 lg:w-36',
           active && 'animate-viva-breathe',
         )}
       >
         <div
           className={cn(
-            'h-16 w-16 rounded-full bg-gradient-to-br shadow-inner sm:h-20 sm:w-20',
+            'h-12 w-12 rounded-full bg-gradient-to-br shadow-inner sm:h-16 sm:w-16 lg:h-20 lg:w-20',
             colors.core,
           )}
         />

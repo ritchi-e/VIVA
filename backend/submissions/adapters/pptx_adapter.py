@@ -5,6 +5,7 @@ from io import BytesIO
 from pptx import Presentation
 
 from submissions.adapters.base import BaseSubmissionAdapter, ExtractedDocument
+from submissions.text_sanitize import sanitize_json, sanitize_text
 
 
 class PptxAdapter(BaseSubmissionAdapter):
@@ -21,7 +22,7 @@ class PptxAdapter(BaseSubmissionAdapter):
             slides.append({"slide": idx + 1, "texts": texts})
         full_text = "\n\n".join("\n".join(s["texts"]) for s in slides)
         return ExtractedDocument(
-            text=full_text,
-            structure={"slides": slides, "slide_count": len(slides)},
+            text=sanitize_text(full_text),
+            structure=sanitize_json({"slides": slides, "slide_count": len(slides)}),
             source_ref=filename,
         )

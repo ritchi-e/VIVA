@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
+  Award,
   BookOpen,
   ClipboardList,
   FileText,
@@ -33,6 +34,7 @@ const instructorNav: NavItem[] = [
 const studentNav: NavItem[] = [
   { to: '/student/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/student/assignments', label: 'Assignments', icon: ClipboardList },
+  { to: '/student/results', label: 'Results', icon: Award },
 ]
 
 function NavItems({ items }: { items: NavItem[] }) {

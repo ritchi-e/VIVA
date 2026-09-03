@@ -12,7 +12,7 @@ export function StudentVivaPage() {
   const { data, loading, error, reload } = useAsync(
     () => {
       if (!id || id === 'undefined') {
-        return Promise.reject(new Error('Missing viva session id. Start the viva again from your assignment.'))
+        return Promise.reject(new Error('Missing viva session. Return to the dashboard and join from your booked slot.'))
       }
       return vivaApi.get(id).then((r) => r.data)
     },
@@ -30,8 +30,8 @@ export function StudentVivaPage() {
   useEffect(() => {
     if (!id || id === 'undefined' || !data) return
     if (!['CREATED', 'PREPARING'].includes(data.state)) return
-    void vivaApi.prepare(id).catch(() => {
-      /* VivaInterface / websocket will surface errors */
+    void vivaApi.prepare(id).then(() => reload()).catch(() => {
+      void reload()
     })
   }, [id, data?.state])
 
@@ -48,7 +48,9 @@ export function StudentVivaPage() {
     return (
       <ErrorState
         message={formatVivaErrorMessage(data.error_message)}
-        onRetry={reload}
+        onRetry={() => {
+          void vivaApi.prepare(id).then(() => reload()).catch(() => reload())
+        }}
       />
     )
   }

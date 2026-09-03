@@ -57,6 +57,8 @@ const EXACT: Record<string, string> = {
     'You already submitted this version. Refresh the page and try again.',
   'File upload to storage failed. Check MinIO is running and try again.':
     'We could not save your file. Please try uploading again.',
+  'Could not fetch the repository. Check the URL and try again.':
+    'We could not fetch your GitHub repository. Check the URL and try again.',
 
   // Viva
   'Timed out while preparing viva questions':
@@ -113,8 +115,33 @@ const PATTERN_RULES: { test: RegExp; message: string }[] = [
     message: 'We could not download your repository from GitHub. Please try again.',
   },
   {
-    test: /Could not fetch the repository:/i,
-    message: 'We could not fetch your GitHub repository. Check the URL and try again.',
+    test: /NUL \(0x00\)|cannot contain NUL/i,
+    message:
+      'This file could not be processed because it contains unreadable data. Try a different PDF export or a cleaner GitHub repo.',
+  },
+  {
+    test: /Invalid object|PdfReadError|EOF marker|Stream has ended/i,
+    message: 'This PDF looks damaged or unsupported. Export it again as a standard PDF and resubmit.',
+  },
+  {
+    test: /No readable text was found in this PDF/i,
+    message: 'No readable text was found in this PDF. If it is a scan, export a text PDF and try again.',
+  },
+  {
+    test: /password-protected/i,
+    message: 'This PDF is password-protected and cannot be processed.',
+  },
+  {
+    test: /does not look like a valid PDF/i,
+    message: 'That file does not look like a valid PDF. Please upload a PDF and try again.',
+  },
+  {
+    test: /NoSuchKey|InvalidObjectName|InvalidObjectState/i,
+    message: 'We could not load the uploaded file from storage. Please try submitting again.',
+  },
+  {
+    test: /could not load the uploaded file/i,
+    message: 'We could not load the uploaded file. Please try submitting again.',
   },
   {
     test: /Object storage upload failed/i,
@@ -157,6 +184,18 @@ const PATTERN_RULES: { test: RegExp; message: string }[] = [
     message: 'We had trouble preparing your viva questions. Please try again.',
   },
   {
+    test: /insufficient_balance|prepaid balance|Rumik TTS failed \(402\)/i,
+    message: 'Examiner voice is temporarily unavailable. You can continue the viva in text, or try preview again later.',
+  },
+  {
+    test: /Examiner voice is temporarily unavailable/i,
+    message: 'Examiner voice is temporarily unavailable. You can continue the viva in text, or try preview again later.',
+  },
+  {
+    test: /\[object Blob\]/i,
+    message: 'Voice playback failed. You can continue the viva without preview.',
+  },
+  {
     test: /Deepgram|Rumik TTS|transcription failed|STT/i,
     message: 'Voice features are temporarily unavailable. Try again or use text mode.',
   },
@@ -187,6 +226,9 @@ const DEFAULT_BY_CATEGORY: Record<ErrorCategory, string> = {
 function normalizeRaw(raw: unknown): string {
   if (raw == null) return ''
   if (typeof raw === 'string') return raw.trim()
+  if (typeof Blob !== 'undefined' && raw instanceof Blob) {
+    return ''
+  }
   if (Array.isArray(raw)) {
     return raw.map((item) => normalizeRaw(item)).filter(Boolean).join(' ')
   }
@@ -194,17 +236,20 @@ function normalizeRaw(raw: unknown): string {
     const obj = raw as Record<string, unknown>
     if (typeof obj.detail === 'string') return obj.detail.trim()
     if (Array.isArray(obj.detail)) return normalizeRaw(obj.detail)
+    if (typeof obj.error === 'string') return obj.error.trim()
     if (typeof obj.message === 'string') return obj.message.trim()
     if (Array.isArray(obj.non_field_errors)) return normalizeRaw(obj.non_field_errors)
     const fieldMessages = Object.entries(obj)
-      .filter(([key]) => !['detail', 'message', 'non_field_errors'].includes(key))
+      .filter(([key]) => !['detail', 'message', 'non_field_errors', 'error', 'code'].includes(key))
       .flatMap(([, value]) => {
         const text = normalizeRaw(value)
         return text ? [text] : []
       })
     if (fieldMessages.length) return fieldMessages.join(' ')
   }
-  return String(raw).trim()
+  const asString = String(raw).trim()
+  if (asString === '[object Blob]') return ''
+  return asString
 }
 
 function looksTechnical(message: string): boolean {

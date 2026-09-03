@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import logging
+
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -18,6 +22,25 @@ from viva.serializers import (
     VivaSessionCreateSerializer,
     VivaSessionSerializer,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _synthesize_tts_fallback(text: str) -> tuple[bytes, str] | None:
+    """Use OpenAI TTS when Rumik is down or out of credit."""
+    from django.conf import settings as dj_settings
+
+    if not (getattr(dj_settings, "OPENAI_API_KEY", "") or "").strip():
+        return None
+    try:
+        from ai.providers.openai_provider import OpenAITTSProvider
+
+        audio = OpenAITTSProvider().synthesize(text)
+        if audio:
+            return audio, "audio/mpeg"
+    except Exception:
+        logger.exception("OpenAI TTS fallback failed")
+    return None
 
 
 class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
@@ -241,6 +264,7 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
         question_id = request.data.get("question_id")
         text = (request.data.get("text") or "").strip()
         speaker = (request.data.get("speaker") or request.data.get("voice") or "").strip().lower()
+        preview = str(request.data.get("preview") or "").lower() in {"1", "true", "yes"}
         if question_id:
             question = VivaQuestion.objects.get(pk=question_id, session=session)
             text = question.question_text
@@ -254,7 +278,6 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
             kwargs = {}
             if isinstance(provider, RumikTTSProvider):
                 config = dict(session.config or {})
-                locked = str(config.get("examiner_speaker") or "").lower().strip()
 
                 if speaker and speaker not in ALLOWED_SPEAKERS:
                     return Response(
@@ -262,25 +285,42 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-                # Lock voice for the whole viva: first valid speaker wins; later requests reuse it.
-                if locked in ALLOWED_SPEAKERS:
-                    speaker = locked
-                elif speaker in ALLOWED_SPEAKERS:
-                    config["examiner_speaker"] = speaker
-                    session.config = config
-                    session.save(update_fields=["config", "updated_at"])
-                else:
-                    speaker = str(
-                        getattr(dj_settings, "RUMIK_TTS_DEFAULT_SPEAKER", "siya") or "siya"
-                    ).lower().strip()
+                if preview:
+                    if speaker not in ALLOWED_SPEAKERS:
+                        speaker = str(
+                            getattr(dj_settings, "RUMIK_TTS_DEFAULT_SPEAKER", "siya") or "siya"
+                        ).lower().strip()
                     if speaker not in ALLOWED_SPEAKERS:
                         speaker = "siya"
+                else:
+                    # Lock voice for the whole viva: first valid speaker wins; later requests reuse it.
+                    locked = str(config.get("examiner_speaker") or "").lower().strip()
+                    if locked in ALLOWED_SPEAKERS:
+                        speaker = locked
+                    elif speaker in ALLOWED_SPEAKERS:
+                        config["examiner_speaker"] = speaker
+                        session.config = config
+                        session.save(update_fields=["config", "updated_at"])
+                    else:
+                        speaker = str(
+                            getattr(dj_settings, "RUMIK_TTS_DEFAULT_SPEAKER", "siya") or "siya"
+                        ).lower().strip()
+                        if speaker not in ALLOWED_SPEAKERS:
+                            speaker = "siya"
 
                 kwargs["speaker"] = speaker
             audio = provider.synthesize(text, **kwargs)
             content_type = "audio/wav" if isinstance(provider, RumikTTSProvider) else "audio/mpeg"
         except Exception as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+            logger.warning("Primary TTS failed: %s", exc)
+            fallback_audio = _synthesize_tts_fallback(text)
+            if fallback_audio:
+                audio, content_type = fallback_audio
+            else:
+                return Response(
+                    {"detail": "Examiner voice is temporarily unavailable. You can continue in text mode."},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
         return HttpResponse(audio, content_type=content_type)
 
     @action(detail=True, methods=["post"])

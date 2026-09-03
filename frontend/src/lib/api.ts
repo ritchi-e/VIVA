@@ -90,6 +90,15 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    const blobBody = error.response?.data
+    if (typeof Blob !== 'undefined' && blobBody instanceof Blob) {
+      const text = await blobBody.text()
+      try {
+        error.response!.data = JSON.parse(text)
+      } catch {
+        error.response!.data = text
+      }
+    }
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
     if (error.response?.status === 401 && original && !original._retry) {
       original._retry = true
@@ -372,6 +381,7 @@ export interface SlotBooking {
   slot_end: string
   status: string
   viva_session_id: string | null
+  viva_session_state?: string | null
   created_at: string
 }
 

@@ -121,11 +121,21 @@ export function StudentSlotBookingPage() {
                     Cancel
                   </Button>
                 )}
-                {activeBooking.viva_session_id && (
-                  <Button onClick={() => navigate(`/student/viva/${activeBooking.viva_session_id}`)}>
-                    Join Viva
-                  </Button>
-                )}
+                {(() => {
+                  const now = new Date()
+                  const startsAt = new Date(activeBooking.slot_start)
+                  const endsAt = new Date(activeBooking.slot_end)
+                  const canJoin = now >= startsAt && now <= endsAt
+                  if (!canJoin) return null
+                  if (activeBooking.viva_session_id) {
+                    return (
+                      <Button onClick={() => navigate(`/student/viva/${activeBooking.viva_session_id}`)}>
+                        Join viva
+                      </Button>
+                    )
+                  }
+                  return null
+                })()}
               </div>
             </div>
           </CardBody>

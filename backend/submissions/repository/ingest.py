@@ -21,6 +21,7 @@ from submissions.repository.limits import RepoLimitError, static_ingestion_enabl
 from submissions.repository.parse import parse_source
 from submissions.repository.profile import build_project_profile
 from submissions.repository.urls import GithubUrlError, parse_github_url
+from submissions.text_sanitize import sanitize_json, sanitize_text
 
 logger = logging.getLogger(__name__)
 
@@ -65,12 +66,25 @@ def ingest_github_repository(submission: Submission) -> RepositorySnapshot | Non
 
     started = time.monotonic()
     try:
+        archive = None
         if snapshot.archive_storage_key and snapshot.commit_sha:
-            archive = load_archive(snapshot.archive_storage_key)
-        else:
+            try:
+                archive = load_archive(snapshot.archive_storage_key)
+            except Exception:
+                logger.warning(
+                    "Cached repository archive missing for submission %s; re-downloading",
+                    submission.id,
+                    exc_info=True,
+                )
+                archive = None
+        if archive is None:
             meta = resolve_and_download(parsed)
             org_id = submission.assignment.course.organization_id
-            key = persist_archive(org_id, submission.id, meta.commit_sha, meta.archive_bytes)
+            try:
+                key = persist_archive(org_id, submission.id, meta.commit_sha, meta.archive_bytes)
+            except Exception as exc:
+                logger.exception("Could not store repository archive for submission %s", submission.id)
+                raise GithubFetchError("Could not save the repository snapshot. Please try again.") from exc
             snapshot.default_branch = meta.default_branch
             snapshot.commit_sha = meta.commit_sha
             snapshot.archive_storage_key = key
@@ -90,11 +104,17 @@ def ingest_github_repository(submission: Submission) -> RepositorySnapshot | Non
         raise
     except Exception as exc:
         logger.exception("GitHub fetch failed for submission %s", submission.id)
-        raise GithubFetchError(f"Could not fetch the repository: {exc}") from exc
+        raise GithubFetchError("Could not fetch the repository. Check the URL and try again.") from exc
 
     _set_stage(submission, Submission.ProcessingStage.INDEXING_FILES)
     started = time.monotonic()
-    inventory = extract_zip_inventory(archive)
+    try:
+        inventory = extract_zip_inventory(archive)
+    except RepoLimitError:
+        raise
+    except Exception as exc:
+        logger.exception("Repository zip extract failed for submission %s", submission.id)
+        raise GithubFetchError("We could not read the repository download. Please try again.") from exc
     snapshot.files.all().delete()
     file_rows: list[RepositoryFile] = []
     for item in inventory:
@@ -102,14 +122,14 @@ def ingest_github_repository(submission: Submission) -> RepositorySnapshot | Non
         file_rows.append(
             RepositoryFile(
                 snapshot=snapshot,
-                path=item.path[:1024],
+                path=sanitize_text(item.path)[:1024],
                 language=item.language[:32],
                 category=item.category,
                 size_bytes=item.size_bytes,
                 content_hash=item.content_hash,
                 indexed=item.indexed,
                 skip_reason=item.skip_reason[:128],
-                extracted_text=item.content[:120_000] if item.indexed else "",
+                extracted_text=sanitize_text(item.content[:120_000]) if item.indexed else "",
             )
         )
     RepositoryFile.objects.bulk_create(file_rows, batch_size=200)
@@ -137,14 +157,14 @@ def ingest_github_repository(submission: Submission) -> RepositorySnapshot | Non
                 CodeSymbol(
                     snapshot=snapshot,
                     repository_file=repo_file,
-                    name=symbol.name[:256],
+                    name=sanitize_text(symbol.name)[:256],
                     kind=symbol.kind if symbol.kind in {c.value for c in CodeSymbol.Kind} else CodeSymbol.Kind.OTHER,
-                    signature=symbol.signature[:1024],
-                    docstring=symbol.docstring[:4000],
+                    signature=sanitize_text(symbol.signature)[:1024],
+                    docstring=sanitize_text(symbol.docstring)[:4000],
                     start_line=symbol.start_line,
                     end_line=symbol.end_line,
                     language=repo_file.language,
-                    metadata=symbol.metadata,
+                    metadata=sanitize_json(symbol.metadata),
                 )
             )
         imports_by_file[repo_file.path] = parsed_source.imports
@@ -166,18 +186,20 @@ def ingest_github_repository(submission: Submission) -> RepositorySnapshot | Non
                     to_path=target.path if target else imported.module[:1024],
                     kind=CodeDependency.Kind.IMPORT if target else CodeDependency.Kind.UNRESOLVED,
                     resolved=bool(target),
-                    metadata={"module": imported.module, "names": imported.names},
+                    metadata=sanitize_json({"module": imported.module, "names": imported.names}),
                 )
             )
     CodeDependency.objects.bulk_create(dep_rows, batch_size=200)
 
-    snapshot.project_profile = build_project_profile(
-        owner=snapshot.owner,
-        repo=snapshot.repo,
-        commit_sha=snapshot.commit_sha,
-        files=list(snapshot.files.all()),
-        symbols=list(snapshot.symbols.all()),
-        dependencies=list(snapshot.dependencies.all()),
+    snapshot.project_profile = sanitize_json(
+        build_project_profile(
+            owner=snapshot.owner,
+            repo=snapshot.repo,
+            commit_sha=snapshot.commit_sha,
+            files=list(snapshot.files.all()),
+            symbols=list(snapshot.symbols.all()),
+            dependencies=list(snapshot.dependencies.all()),
+        )
     )
     snapshot.status = RepositorySnapshot.Status.INDEXED
     snapshot.save(update_fields=["project_profile", "status", "updated_at"])
@@ -214,7 +236,9 @@ def create_repository_chunks(submission: Submission, snapshot: RepositorySnapsho
             kind = unit["kind"]
             if config_kind and kind in {"document", "fallback"}:
                 kind = "config"
-            content = unit["content"]
+            content = sanitize_text(unit["content"])
+            if not content.strip():
+                continue
             digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
             chunks.append(
                 SubmissionChunk(
@@ -223,13 +247,13 @@ def create_repository_chunks(submission: Submission, snapshot: RepositorySnapsho
                     chunk_index=index,
                     content=content,
                     token_count=len(content.split()),
-                    metadata={
+                    metadata=sanitize_json({
                         "path": unit["path"],
                         "language": unit["language"],
                         "symbol": unit["symbol"],
                         "start_line": unit["start_line"],
                         "end_line": unit["end_line"],
-                    },
+                    }),
                     source_ref=source_ref_for(unit["path"], unit["start_line"], unit["end_line"]),
                     path=unit["path"],
                     language=unit["language"],

@@ -226,7 +226,7 @@ export function ReportsPage() {
                       {data.recent_sessions.map((session) => (
                         <tr key={session.id} className="border-b border-slate-100">
                           <td className="py-3 pr-4">
-                            <Link to={`/viva-sessions/${session.id}`} className="text-blue-700 hover:underline">
+                            <Link to={`/viva-sessions/${session.id}`} className="mk-link">
                               {session.assignment_title}
                             </Link>
                           </td>

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { AlertCircle, Inbox } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { Card, CardBody } from '@/components/ui/Card'
 
 export function EmptyState({
   title,
@@ -12,16 +13,20 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-      <div className="rounded-full bg-slate-100 p-3 text-slate-500">
-        <Inbox className="h-6 w-6" />
-      </div>
-      <div>
-        <p className="font-medium text-slate-900">{title}</p>
-        {description ? <p className="mt-1 max-w-md text-sm text-slate-500">{description}</p> : null}
-      </div>
-      {action}
-    </div>
+    <Card>
+      <CardBody className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+        <div className="rounded-full bg-[var(--color-sidebar-active)] p-3.5 text-[var(--color-primary)]">
+          <Inbox className="h-6 w-6" />
+        </div>
+        <div>
+          <p className="font-display text-lg font-semibold text-[var(--color-foreground)]">{title}</p>
+          {description ? (
+            <p className="mt-1.5 max-w-md text-base text-[var(--color-muted)]">{description}</p>
+          ) : null}
+        </div>
+        {action}
+      </CardBody>
+    </Card>
   )
 }
 
@@ -33,19 +38,23 @@ export function ErrorState({
   onRetry?: () => void
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-      <div className="rounded-full bg-red-50 p-3 text-red-600">
-        <AlertCircle className="h-6 w-6" />
-      </div>
-      <div>
-        <p className="font-medium text-slate-900">Unable to load data</p>
-        <p className="mt-1 max-w-md text-sm text-slate-500">{message}</p>
-      </div>
-      {onRetry ? (
-        <Button variant="secondary" onClick={onRetry}>
-          Try again
-        </Button>
-      ) : null}
-    </div>
+    <Card>
+      <CardBody className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+        <div className="rounded-full bg-red-50 p-3.5 text-[var(--color-danger)]">
+          <AlertCircle className="h-6 w-6" />
+        </div>
+        <div>
+          <p className="font-display text-lg font-semibold text-[var(--color-foreground)]">
+            Unable to load data
+          </p>
+          <p className="mt-1.5 max-w-md text-base text-[var(--color-muted)]">{message}</p>
+        </div>
+        {onRetry ? (
+          <Button variant="secondary" onClick={onRetry}>
+            Try again
+          </Button>
+        ) : null}
+      </CardBody>
+    </Card>
   )
 }

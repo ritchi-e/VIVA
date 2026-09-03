@@ -33,7 +33,7 @@ export function CourseDetailPage() {
         {assignments.data?.map((a) => (
           <Card key={a.id}>
             <CardBody>
-              <Link to={`/assignments/${a.id}`} className="font-medium text-blue-700 hover:underline">
+              <Link to={`/assignments/${a.id}`} className="mk-link">
                 {a.title}
               </Link>
             </CardBody>

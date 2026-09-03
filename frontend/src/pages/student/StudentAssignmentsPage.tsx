@@ -20,15 +20,15 @@ export function StudentAssignmentsPage() {
       {!loading && !error && data?.length === 0 ? (
         <EmptyState title="No assignments" description="Your instructor has not published assignments yet." />
       ) : null}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {data?.map((a) => (
-          <Card key={a.id}>
-            <CardBody className="flex items-center justify-between gap-3">
+          <Card key={a.id} hover>
+            <CardBody className="flex items-center justify-between gap-3 py-4">
               <div>
-                <Link to={`/student/assignments/${a.id}`} className="font-medium text-slate-900 hover:text-blue-700">
+                <Link to={`/student/assignments/${a.id}`} className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]">
                   {a.title}
                 </Link>
-                <p className="mt-1 text-sm text-slate-500">Due {formatDate(a.due_at)}</p>
+                <p className="mt-1 text-sm text-[var(--color-muted)]">Due {formatDate(a.due_at)}</p>
               </div>
               <Badge tone={a.status === 'published' ? 'success' : 'default'}>{a.status}</Badge>
             </CardBody>

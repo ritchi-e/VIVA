@@ -20,22 +20,22 @@ export function VivaSessionsPage() {
       {!loading && !error && data?.length === 0 ? (
         <EmptyState title="No viva sessions" description="Sessions are created when students start a viva." />
       ) : null}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {data?.map((session) => (
-          <Card key={session.id}>
-            <CardBody className="flex flex-wrap items-center justify-between gap-3">
+          <Card key={session.id} hover>
+            <CardBody className="flex flex-wrap items-center justify-between gap-3 py-4">
               <div>
-                <Link to={`/viva-sessions/${session.id}`} className="font-medium text-slate-900 hover:text-blue-700">
+                <Link to={`/viva-sessions/${session.id}`} className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]">
                   {session.assignment_title || `Session ${session.id.slice(0, 8)}`}
                 </Link>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-[var(--color-muted)]">
                   {session.student_name || session.student_email || session.student} ·{' '}
                   {session.questions_asked}/{session.question_budget} questions · {session.mode} ·{' '}
                   {formatDate(session.started_at ?? session.created_at)}
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <Link to={`/submissions/${session.submission}`} className="text-xs text-blue-700 hover:underline">
+                <Link to={`/submissions/${session.submission}`} className="mk-link text-sm">
                   Submission
                 </Link>
                 <Badge

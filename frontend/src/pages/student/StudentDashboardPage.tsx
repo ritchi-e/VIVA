@@ -22,7 +22,13 @@ import { formatDate, formatScore } from '@/lib/utils'
 
 function slotTimeLabel(iso: string) {
   const d = new Date(iso)
-  return d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 export function StudentDashboardPage() {
@@ -64,7 +70,9 @@ export function StudentDashboardPage() {
   const published = (assignments.data || []).filter((a) => a.status === 'published')
   const recentSessions = (sessions.data || []).slice(0, 5)
   const recentSubs = (submissions.data || []).slice(0, 5)
-  const completedAssessments = (assessments.data || []).filter((a) => a.overall_score != null || a.ai_overall_score != null)
+  const completedAssessments = (assessments.data || []).filter(
+    (a) => a.overall_score != null || a.ai_overall_score != null,
+  )
   const scoreValues = completedAssessments
     .map((a) => a.overall_score ?? a.ai_overall_score)
     .filter((n): n is number => n != null)
@@ -78,49 +86,59 @@ export function StudentDashboardPage() {
   return (
     <div>
       {startingViva && <PreparingVivaOverlay />}
-      <PageHeader title="Student dashboard" description="Your assignments, submissions, and viva progress." />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
+      <PageHeader
+        title="Student dashboard"
+        description="Your assignments, submissions, and viva progress."
+      />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card hover>
           <CardBody>
-            <p className="text-sm text-slate-500">Open assignments</p>
-            <p className="mt-2 text-3xl font-semibold">{published.length}</p>
+            <p className="text-sm font-medium text-[var(--color-muted)]">Open assignments</p>
+            <p className="mk-kpi mt-2">{published.length}</p>
           </CardBody>
         </Card>
-        <Card>
+        <Card hover>
           <CardBody>
-            <p className="text-sm text-slate-500">Submissions</p>
-            <p className="mt-2 text-3xl font-semibold">{submissions.data?.length ?? '—'}</p>
+            <p className="text-sm font-medium text-[var(--color-muted)]">Submissions</p>
+            <p className="mk-kpi mt-2">{submissions.data?.length ?? '—'}</p>
           </CardBody>
         </Card>
-        <Card>
+        <Card hover>
           <CardBody>
-            <p className="text-sm text-slate-500">Vivas completed</p>
-            <p className="mt-2 text-3xl font-semibold">{sessions.data ? completedVivas : '—'}</p>
+            <p className="text-sm font-medium text-[var(--color-muted)]">Vivas completed</p>
+            <p className="mk-kpi mt-2">{sessions.data ? completedVivas : '—'}</p>
           </CardBody>
         </Card>
-        <Card>
+        <Card hover>
           <CardBody>
-            <p className="text-sm text-slate-500">Average score</p>
-            <p className="mt-2 text-3xl font-semibold">{averageScore == null ? '—' : formatScore(averageScore)}</p>
+            <p className="text-sm font-medium text-[var(--color-muted)]">Average score</p>
+            <p className="mk-kpi mt-2">
+              {averageScore == null ? '—' : formatScore(averageScore)}
+            </p>
           </CardBody>
         </Card>
       </div>
 
       {vivaError && (
-        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{vivaError}</div>
+        <div className="mt-4 rounded-[var(--radius-control)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {vivaError}
+        </div>
       )}
 
       {(assignments.loading || submissions.loading || sessions.loading) && (
-        <div className="mt-6">
+        <div className="mt-5">
           <ProgressPanel copy={PLATFORM_PROGRESS.dashboard} />
         </div>
       )}
 
-      {(bookings.data ?? []).filter((b) => b.status === 'booked' || b.status === 'started').length > 0 && (
-        <Card className="mt-6">
+      {(bookings.data ?? []).filter((b) => b.status === 'booked' || b.status === 'started').length >
+        0 && (
+        <Card className="mt-5">
           <CardBody>
-            <h2 className="mb-3 text-sm font-semibold text-slate-900">Upcoming booked slots</h2>
-            <ul className="space-y-3">
+            <h2 className="mb-4 font-display text-lg font-semibold text-[var(--color-foreground)]">
+              Upcoming booked slots
+            </h2>
+            <ul className="space-y-2">
               {bookings.data!
                 .filter((b) => b.status === 'booked' || b.status === 'started')
                 .map((b) => {
@@ -131,38 +149,65 @@ export function StudentDashboardPage() {
                   const canJoin = !expired && (b.status === 'started' || startsAt <= now)
                   const sessionState = b.viva_session_state || null
                   const sessionFailed = sessionState === 'FAILED'
-                  const sessionDone = sessionState === 'COMPLETED' || sessionState === 'REVIEW_REQUIRED'
+                  const sessionDone =
+                    sessionState === 'COMPLETED' || sessionState === 'REVIEW_REQUIRED'
                   const joinableSession =
                     Boolean(b.viva_session_id) &&
                     !sessionFailed &&
                     !sessionDone &&
-                    (!sessionState || ['READY', 'IN_PROGRESS', 'PREPARING', 'CREATED'].includes(sessionState))
+                    (!sessionState ||
+                      ['READY', 'IN_PROGRESS', 'PREPARING', 'CREATED'].includes(sessionState))
                   return (
-                    <li key={b.id} className={`flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${expired ? 'border-red-100 bg-red-50/50' : 'border-slate-100 bg-slate-50'}`}>
+                    <li
+                      key={b.id}
+                      className={`flex flex-col gap-3 rounded-[var(--radius-control)] border px-4 py-4 sm:flex-row sm:items-center sm:justify-between ${
+                        expired
+                          ? 'border-red-100 bg-red-50/50'
+                          : 'border-[var(--color-border)] bg-[var(--color-sidebar-active)]/40'
+                      }`}
+                    >
                       <div>
-                        <p className="text-sm font-medium text-slate-900">{b.assignment_title}</p>
-                        <p className="text-xs text-slate-500">{slotTimeLabel(b.slot_start)} — {slotTimeLabel(b.slot_end)}</p>
+                        <p className="text-base font-semibold text-[var(--color-foreground)]">
+                          {b.assignment_title}
+                        </p>
+                        <p className="mt-0.5 text-sm text-[var(--color-muted)]">
+                          {slotTimeLabel(b.slot_start)} — {slotTimeLabel(b.slot_end)}
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
                         {expired ? (
-                          <span className="text-xs font-medium text-red-600">Slot expired</span>
+                          <span className="text-sm font-medium text-red-600">Slot expired</span>
                         ) : sessionDone ? (
-                          <span className="text-xs font-medium text-emerald-700">Completed</span>
+                          <span className="text-sm font-medium text-emerald-700">Completed</span>
                         ) : sessionFailed && canJoin && b.viva_session_id ? (
-                          <Button className="px-3 py-1.5 text-xs" onClick={() => navigate(`/student/viva/${b.viva_session_id}`)}>
+                          <Button
+                            className="px-3 py-2 text-sm"
+                            onClick={() => navigate(`/student/viva/${b.viva_session_id}`)}
+                          >
                             Retry viva prep
                           </Button>
                         ) : canJoin && joinableSession ? (
-                          <Button className="px-3 py-1.5 text-xs" onClick={() => navigate(`/student/viva/${b.viva_session_id}`)}>
+                          <Button
+                            className="px-3 py-2 text-sm"
+                            onClick={() => navigate(`/student/viva/${b.viva_session_id}`)}
+                          >
                             Join viva
                           </Button>
                         ) : canJoin ? (
-                          <Button className="px-3 py-1.5 text-xs" loading={startingViva} onClick={() => startVivaFromBooking(b)}>
+                          <Button
+                            className="px-3 py-2 text-sm"
+                            loading={startingViva}
+                            onClick={() => startVivaFromBooking(b)}
+                          >
                             Start viva
                           </Button>
                         ) : (
-                          <span className="text-xs text-slate-500">
-                            Starts {startsAt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                          <span className="text-sm text-[var(--color-muted)]">
+                            Starts{' '}
+                            {startsAt.toLocaleTimeString(undefined, {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
                           </span>
                         )}
                       </div>
@@ -174,41 +219,54 @@ export function StudentDashboardPage() {
         </Card>
       )}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-5 grid gap-3 lg:grid-cols-2">
         <Card>
           <CardBody>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">Recent viva sessions</h2>
-              <Link to="/student/assignments" className="text-xs font-medium text-blue-700 hover:underline">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-lg font-semibold text-[var(--color-foreground)]">
+                Recent viva sessions
+              </h2>
+              <Link to="/student/assignments" className="mk-link text-sm">
                 Assignments
               </Link>
             </div>
             {recentSessions.length === 0 ? (
-              <p className="text-sm text-slate-600">No viva sessions yet. Book a slot after your submission is ready.</p>
+              <p className="text-base text-[var(--color-muted)]">
+                No viva sessions yet. Book a slot after your submission is ready.
+              </p>
             ) : (
               <ul className="space-y-3">
                 {recentSessions.map((s) => {
                   const done = ['COMPLETED', 'REVIEW_REQUIRED'].includes(s.state)
-                  const href = done ? `/student/results/${s.id}` : `/student/assignments/${s.assignment}`
+                  const href = done
+                    ? `/student/results/${s.id}`
+                    : `/student/assignments/${s.assignment}`
                   return (
-                  <li key={s.id} className="flex items-center justify-between gap-3 text-sm">
-                    <div>
-                      <Link to={href} className="font-medium text-slate-900 hover:text-blue-700">
-                        {s.assignment_title || 'Viva session'}
-                      </Link>
-                      <p className="text-xs text-slate-500">
-                        {s.questions_asked}/{s.question_budget} · {formatDate(s.started_at ?? s.created_at)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge tone={s.state === 'COMPLETED' ? 'success' : 'info'}>{s.state}</Badge>
-                      {done ? (
-                        <Link to={`/student/results/${s.id}`} className="text-xs text-blue-700 hover:underline">
-                          Analysis
+                    <li
+                      key={s.id}
+                      className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] py-3 last:border-0 last:pb-0"
+                    >
+                      <div>
+                        <Link
+                          to={href}
+                          className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]"
+                        >
+                          {s.assignment_title || 'Viva session'}
                         </Link>
-                      ) : null}
-                    </div>
-                  </li>
+                        <p className="mt-0.5 text-sm text-[var(--color-muted)]">
+                          {s.questions_asked}/{s.question_budget} ·{' '}
+                          {formatDate(s.started_at ?? s.created_at)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge tone={s.state === 'COMPLETED' ? 'success' : 'info'}>{s.state}</Badge>
+                        {done ? (
+                          <Link to={`/student/results/${s.id}`} className="mk-link text-sm">
+                            Analysis
+                          </Link>
+                        ) : null}
+                      </div>
+                    </li>
                   )
                 })}
               </ul>
@@ -218,20 +276,29 @@ export function StudentDashboardPage() {
 
         <Card>
           <CardBody>
-            <h2 className="mb-3 text-sm font-semibold text-slate-900">Recent submissions</h2>
+            <h2 className="mb-4 font-display text-lg font-semibold text-[var(--color-foreground)]">
+              Recent submissions
+            </h2>
             {recentSubs.length === 0 ? (
-              <p className="text-sm text-slate-600">No submissions yet.</p>
+              <p className="text-base text-[var(--color-muted)]">No submissions yet.</p>
             ) : (
               <ul className="space-y-3">
                 {recentSubs.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between gap-3 text-sm">
+                  <li
+                    key={s.id}
+                    className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] py-3 last:border-0 last:pb-0"
+                  >
                     <Link
                       to={`/student/submissions/${s.id}`}
-                      className="font-medium text-slate-900 hover:text-blue-700"
+                      className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]"
                     >
                       {s.assignment_title || 'Submission'}
                     </Link>
-                    <Badge tone={s.status === 'ready' ? 'success' : s.status === 'failed' ? 'danger' : 'default'}>
+                    <Badge
+                      tone={
+                        s.status === 'ready' ? 'success' : s.status === 'failed' ? 'danger' : 'default'
+                      }
+                    >
                       {s.status}
                     </Badge>
                   </li>
@@ -243,22 +310,29 @@ export function StudentDashboardPage() {
       </div>
 
       {completedAssessments.length > 0 ? (
-        <Card className="mt-6">
+        <Card className="mt-5">
           <CardBody>
-            <h2 className="mb-3 text-sm font-semibold text-slate-900">Your performance</h2>
+            <h2 className="mb-4 font-display text-lg font-semibold text-[var(--color-foreground)]">
+              Your performance
+            </h2>
             <ul className="space-y-3">
               {completedAssessments.slice(0, 6).map((a) => (
-                <li key={a.id} className="flex items-center justify-between gap-3 text-sm">
+                <li
+                  key={a.id}
+                  className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] py-3 last:border-0 last:pb-0"
+                >
                   <div>
                     <Link
                       to={`/student/results/${a.viva_session}`}
-                      className="font-medium text-slate-900 hover:text-blue-700"
+                      className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]"
                     >
                       {a.assignment_title || 'Viva analysis'}
                     </Link>
-                    <p className="text-xs text-slate-500">{a.status.replace(/_/g, ' ')}</p>
+                    <p className="mt-0.5 text-sm text-[var(--color-muted)]">
+                      {a.status.replace(/_/g, ' ')}
+                    </p>
                   </div>
-                  <span className="font-semibold tabular-nums text-slate-900">
+                  <span className="font-display text-xl font-semibold tabular-nums text-[var(--color-primary)]">
                     {formatScore(a.overall_score ?? a.ai_overall_score)}
                   </span>
                 </li>

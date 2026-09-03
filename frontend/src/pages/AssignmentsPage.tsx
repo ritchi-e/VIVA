@@ -121,15 +121,15 @@ export function AssignmentsPage() {
       {!loading && !error && data?.length === 0 ? (
         <EmptyState title="No assignments" description="Create an assignment to collect submissions and run vivas." />
       ) : null}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {data?.map((assignment) => (
-          <Card key={assignment.id}>
-            <CardBody className="flex flex-wrap items-center justify-between gap-3">
+          <Card key={assignment.id} hover>
+            <CardBody className="flex flex-wrap items-center justify-between gap-3 py-4">
               <div>
-                <Link to={`/assignments/${assignment.id}`} className="font-medium text-slate-900 hover:text-blue-700">
+                <Link to={`/assignments/${assignment.id}`} className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]">
                   {assignment.title}
                 </Link>
-                <p className="mt-1 text-sm text-slate-500">Due {formatDate(assignment.due_at)}</p>
+                <p className="mt-1 text-sm text-[var(--color-muted)]">Due {formatDate(assignment.due_at)}</p>
               </div>
               <Badge tone={assignment.status === 'published' ? 'success' : 'default'}>{assignment.status}</Badge>
             </CardBody>

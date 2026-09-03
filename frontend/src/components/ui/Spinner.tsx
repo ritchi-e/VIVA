@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 import type { ProgressCopy } from '@/lib/progressCopy'
 
 export function Spinner({ className }: { className?: string }) {
-  return <Loader2 className={cn('h-5 w-5 animate-spin text-teal-700', className)} />
+  return <Loader2 className={cn('h-5 w-5 animate-spin text-[var(--color-primary)]', className)} />
 }
 
 export function LoadingPanel({
@@ -30,14 +30,14 @@ export function LoadingPanel({
       <div className="max-w-sm text-center">
         <p
           className={cn(
-            'font-display text-base font-semibold tracking-tight',
-            dark ? 'text-white' : 'text-slate-900',
+            'font-display text-lg font-semibold tracking-tight',
+            dark ? 'text-white' : 'text-[var(--color-foreground)]',
           )}
         >
           {label}
         </p>
         {detail ? (
-          <p className={cn('mt-1.5 text-sm leading-relaxed', dark ? 'text-white/55' : 'text-slate-500')}>
+          <p className={cn('mt-1.5 text-base leading-relaxed', dark ? 'text-white/55' : 'text-[var(--color-muted)]')}>
             {detail}
           </p>
         ) : null}

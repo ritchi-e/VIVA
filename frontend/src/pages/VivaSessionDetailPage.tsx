@@ -28,7 +28,7 @@ export function VivaSessionDetailPage() {
         title={s.assignment_title || 'Viva session'}
         description={`${s.student_name || s.student_email} · ${s.state} · ${s.mode}`}
         actions={
-          <Link to={`/submissions/${s.submission}`} className="text-sm text-blue-700 hover:underline">
+          <Link to={`/submissions/${s.submission}`} className="mk-link text-sm">
             View submission
           </Link>
         }
@@ -37,13 +37,13 @@ export function VivaSessionDetailPage() {
         <CardBody className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
           <p>
             Student:{' '}
-            <Link to={`/students/${s.student}`} className="text-blue-700 hover:underline">
+            <Link to={`/students/${s.student}`} className="mk-link">
               {s.student_name || s.student_email}
             </Link>
           </p>
           <p>
             Assignment:{' '}
-            <Link to={`/assignments/${s.assignment}`} className="text-blue-700 hover:underline">
+            <Link to={`/assignments/${s.assignment}`} className="mk-link">
               {s.assignment_title || s.assignment}
             </Link>
           </p>
@@ -162,8 +162,8 @@ export function VivaSessionDetailPage() {
                 {evaluation ? (
                   <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-medium uppercase tracking-wide text-blue-700">AI evaluation</p>
-                      <p className="text-sm font-semibold text-blue-900">
+                      <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-primary)]">AI evaluation</p>
+                      <p className="text-sm font-semibold text-[var(--color-primary)]">
                         Overall {formatScore(evaluation.overall)} / 10
                       </p>
                     </div>

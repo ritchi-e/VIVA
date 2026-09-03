@@ -23,21 +23,21 @@ export function StudentResultsListPage() {
           description="Your scores appear here after you complete a booked viva."
         />
       ) : null}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {data?.map((a) => (
-          <Card key={a.id}>
-            <CardBody className="flex flex-wrap items-center justify-between gap-3">
+          <Card key={a.id} hover>
+            <CardBody className="flex flex-wrap items-center justify-between gap-3 py-4">
               <div>
                 <Link
                   to={`/student/results/${a.viva_session}`}
-                  className="font-medium text-slate-900 hover:text-blue-700"
+                  className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]"
                 >
                   {a.assignment_title || 'Viva results'}
                 </Link>
-                <p className="mt-1 text-sm text-slate-500">{a.status.replace(/_/g, ' ')}</p>
+                <p className="mt-1 text-sm text-[var(--color-muted)]">{a.status.replace(/_/g, ' ')}</p>
               </div>
               <div className="flex items-center gap-3">
-                <span className="font-semibold tabular-nums text-slate-900">
+                <span className="font-display text-xl font-semibold tabular-nums text-[var(--color-primary)]">
                   {formatScore(a.overall_score ?? a.ai_overall_score)}
                 </span>
                 <Badge tone={a.status === 'finalized' ? 'success' : 'info'}>

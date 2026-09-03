@@ -25,15 +25,15 @@ export function SubmissionsPage() {
       {!loading && !error && data?.length === 0 ? (
         <EmptyState title="No submissions" description="Submissions appear when students upload assignments." />
       ) : null}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {data?.map((s) => (
-          <Card key={s.id}>
-            <CardBody className="flex flex-wrap items-center justify-between gap-3">
+          <Card key={s.id} hover>
+            <CardBody className="flex flex-wrap items-center justify-between gap-3 py-4">
               <div>
-                <Link to={`/submissions/${s.id}`} className="font-medium text-slate-900 hover:text-blue-700">
+                <Link to={`/submissions/${s.id}`} className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]">
                   {s.assignment_title || 'Submission'} · v{s.version}
                 </Link>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-[var(--color-muted)]">
                   {s.student_name || s.student_email || s.student} · {formatDate(s.created_at)}
                 </p>
                 {s.assignment_mismatch ? (
@@ -41,7 +41,7 @@ export function SubmissionsPage() {
                 ) : null}
               </div>
               <div className="flex items-center gap-3">
-                <Link to={`/assignments/${s.assignment}`} className="text-xs text-blue-700 hover:underline">
+                <Link to={`/assignments/${s.assignment}`} className="mk-link text-sm">
                   Assignment
                 </Link>
                 <div className="flex items-center gap-2">

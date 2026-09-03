@@ -47,7 +47,7 @@ export function StudentSubmissionPage() {
           {data.processed_at ? <p>Processed: {formatDate(data.processed_at)}</p> : null}
           {data.github_url || data.repository ? <RepositorySummary submission={data} /> : null}
           {processingError ? <p className="text-red-600">{processingError}</p> : null}
-          <Link to={`/student/assignments/${data.assignment}`} className="inline-block text-blue-700 hover:underline">
+          <Link to={`/student/assignments/${data.assignment}`} className="mk-link inline-block">
             Back to assignment
           </Link>
         </CardBody>
@@ -68,11 +68,11 @@ export function StudentSubmissionPage() {
                   <div className="flex items-center gap-2">
                     <Badge>{s.state}</Badge>
                     {['COMPLETED', 'REVIEW_REQUIRED'].includes(s.state) ? (
-                      <Link to={`/student/results/${s.id}`} className="text-xs text-blue-700 hover:underline">
+                      <Link to={`/student/results/${s.id}`} className="mk-link text-sm">
                         Analysis
                       </Link>
                     ) : s.state === 'IN_PROGRESS' ? (
-                      <Link to={`/student/viva/${s.id}`} className="text-xs text-blue-700 hover:underline">
+                      <Link to={`/student/viva/${s.id}`} className="mk-link text-sm">
                         Rejoin
                       </Link>
                     ) : null}
@@ -90,7 +90,7 @@ export function StudentSubmissionPage() {
             <p className="font-medium text-slate-900">Assessment status: {assessment.data.status}</p>
             <Link
               to={`/student/results/${assessment.data.viva_session}`}
-              className="mt-2 inline-block text-blue-700 hover:underline"
+              className="mk-link mt-2 inline-block"
             >
               View results →
             </Link>

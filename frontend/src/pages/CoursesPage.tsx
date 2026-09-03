@@ -81,15 +81,15 @@ export function CoursesPage() {
       {!loading && !error && data?.length === 0 ? (
         <EmptyState title="No courses yet" description="Create a course to start publishing assignments." />
       ) : null}
-      <div className="grid gap-4">
+      <div className="grid gap-2">
         {data?.map((course) => (
-          <Card key={course.id}>
-            <CardBody className="flex items-center justify-between gap-4">
+          <Card key={course.id} hover>
+            <CardBody className="flex items-center justify-between gap-4 py-4">
               <div>
-                <Link to={`/courses/${course.id}`} className="font-medium text-slate-900 hover:text-blue-700">
+                <Link to={`/courses/${course.id}`} className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]">
                   {course.code} — {course.title}
                 </Link>
-                <p className="mt-1 text-sm text-slate-500">{course.term || 'No term set'}</p>
+                <p className="mt-1 text-sm text-[var(--color-muted)]">{course.term || 'No term set'}</p>
               </div>
               <Badge tone={course.is_active ? 'success' : 'default'}>
                 {course.is_active ? 'Active' : 'Inactive'}

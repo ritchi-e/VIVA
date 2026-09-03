@@ -40,7 +40,7 @@ export function SubmissionDetailPage() {
         title="Submission review"
         description={`${submission.data.assignment_title || 'Submission'} · ${submission.data.student_name || submission.data.student_email || 'Student'} · v${submission.data.version}`}
         actions={
-          <Link to={`/assignments/${submission.data.assignment}`} className="text-sm text-blue-700 hover:underline">
+          <Link to={`/assignments/${submission.data.assignment}`} className="mk-link text-sm">
             View assignment
           </Link>
         }
@@ -57,7 +57,7 @@ export function SubmissionDetailPage() {
         <CardBody className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
           <p>
             Student:{' '}
-            <Link to={`/students/${submission.data.student}`} className="text-blue-700 hover:underline">
+            <Link to={`/students/${submission.data.student}`} className="mk-link">
               {submission.data.student_name || submission.data.student_email}
             </Link>
           </p>

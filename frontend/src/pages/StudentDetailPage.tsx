@@ -40,7 +40,7 @@ export function StudentDetailPage() {
           <Card key={sub.id}>
             <CardBody className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <Link to={`/submissions/${sub.id}`} className="font-medium text-slate-900 hover:text-blue-700">
+                <Link to={`/submissions/${sub.id}`} className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]">
                   {sub.assignment_title || 'Submission'} · v{sub.version}
                 </Link>
                 <p className="mt-1 text-sm text-slate-500">{formatDate(sub.created_at)}</p>

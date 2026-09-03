@@ -18,17 +18,17 @@ export function StudentsPage() {
       {!loading && !error && data?.length === 0 ? (
         <EmptyState title="No students" description="Invite students to your organization to see them here." />
       ) : null}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {data?.map((student) => (
-          <Card key={student.id}>
-            <CardBody className="flex flex-wrap items-center justify-between gap-3">
+          <Card key={student.id} hover>
+            <CardBody className="flex flex-wrap items-center justify-between gap-3 py-4">
               <div>
-                <Link to={`/students/${student.id}`} className="font-medium text-slate-900 hover:text-blue-700">
+                <Link to={`/students/${student.id}`} className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]">
                   {student.full_name || student.email}
                 </Link>
-                <p className="mt-1 text-sm text-slate-500">{student.email}</p>
+                <p className="mt-1 text-sm text-[var(--color-muted)]">{student.email}</p>
               </div>
-              <div className="text-sm text-slate-500">
+              <div className="text-sm text-[var(--color-muted)]">
                 {student.submissions_count ?? 0} submissions · {student.viva_sessions_count ?? 0} vivas
               </div>
             </CardBody>

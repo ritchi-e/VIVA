@@ -41,7 +41,7 @@ export function StudentResultsPage() {
             >
               Refresh
             </button>
-            <Link to="/student/results" className="inline-block text-blue-700 hover:underline">
+            <Link to="/student/results" className="mk-link inline-block">
               Back to results
             </Link>
           </CardBody>
@@ -61,7 +61,7 @@ export function StudentResultsPage() {
         title="Viva results"
         description={assessment.assignment_title || 'Your score and submitted work'}
         actions={
-          <Link to="/student/results" className="text-sm text-blue-700 hover:underline">
+          <Link to="/student/results" className="mk-link text-sm">
             All results
           </Link>
         }
@@ -85,7 +85,7 @@ export function StudentResultsPage() {
           {githubUrl ? (
             <p className="text-sm">
               GitHub:{' '}
-              <a href={githubUrl} className="break-all text-blue-700 hover:underline" target="_blank" rel="noreferrer">
+              <a href={githubUrl} className="mk-link break-all" target="_blank" rel="noreferrer">
                 {githubUrl}
               </a>
             </p>

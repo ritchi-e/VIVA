@@ -32,7 +32,7 @@ export function DashboardPage() {
         title="Dashboard"
         description="Overview of courses, submissions, and viva activity."
         actions={
-          <Link to="/assignments" className="text-sm font-medium text-blue-700 hover:underline">
+          <Link to="/assignments" className="mk-link text-[15px]">
             Manage assignments
           </Link>
         }
@@ -41,37 +41,45 @@ export function DashboardPage() {
       {error ? <ErrorState message={error} onRetry={reload} /> : null}
       {data ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {metricLabels.map(({ key, label }) => (
-              <Card key={key}>
+              <Card key={key} hover>
                 <CardBody>
-                  <p className="text-sm text-slate-500">{label}</p>
-                  <p className="mt-2 text-3xl font-semibold text-slate-900">{data[key] ?? 0}</p>
+                  <p className="text-sm font-medium text-[var(--color-muted)]">{label}</p>
+                  <p className="mk-kpi mt-2">{data[key] ?? 0}</p>
                 </CardBody>
               </Card>
             ))}
           </div>
 
-          <div className="mt-8 grid gap-4 lg:grid-cols-2">
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
             <Card>
               <CardBody>
-                <h2 className="text-sm font-semibold text-slate-900">Viva activity</h2>
-                <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <h2 className="font-display text-lg font-semibold text-[var(--color-foreground)]">
+                  Viva activity
+                </h2>
+                <dl className="mt-4 grid grid-cols-2 gap-4 text-base">
                   <div>
-                    <dt className="text-slate-500">Completed</dt>
-                    <dd className="font-medium text-slate-900">{data.viva_completion.completed}</dd>
+                    <dt className="text-sm text-[var(--color-muted)]">Completed</dt>
+                    <dd className="mt-1 font-semibold text-[var(--color-foreground)]">
+                      {data.viva_completion.completed}
+                    </dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500">In progress</dt>
-                    <dd className="font-medium text-slate-900">{data.viva_completion.in_progress}</dd>
+                    <dt className="text-sm text-[var(--color-muted)]">In progress</dt>
+                    <dd className="mt-1 font-semibold text-[var(--color-foreground)]">
+                      {data.viva_completion.in_progress}
+                    </dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500">Processing submissions</dt>
-                    <dd className="font-medium text-slate-900">{data.pending_submissions}</dd>
+                    <dt className="text-sm text-[var(--color-muted)]">Processing submissions</dt>
+                    <dd className="mt-1 font-semibold text-[var(--color-foreground)]">
+                      {data.pending_submissions}
+                    </dd>
                   </div>
                   <div>
-                    <dt className="text-slate-500">Avg assessment</dt>
-                    <dd className="font-medium text-slate-900">
+                    <dt className="text-sm text-[var(--color-muted)]">Avg assessment</dt>
+                    <dd className="mt-1 font-semibold text-[var(--color-foreground)]">
                       {data.average_assessment != null ? `${data.average_assessment}%` : '—'}
                     </dd>
                   </div>
@@ -81,41 +89,61 @@ export function DashboardPage() {
 
             <Card>
               <CardBody>
-                <h2 className="text-sm font-semibold text-slate-900">Quick links</h2>
-                <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                  <Link to="/submissions" className="text-blue-700 hover:underline">Review submissions</Link>
-                  <Link to="/viva-sessions" className="text-blue-700 hover:underline">Viva sessions</Link>
-                  <Link to="/students" className="text-blue-700 hover:underline">Students</Link>
-                  <Link to="/reports" className="text-blue-700 hover:underline">Reports</Link>
+                <h2 className="font-display text-lg font-semibold text-[var(--color-foreground)]">
+                  Quick links
+                </h2>
+                <div className="mt-4 flex flex-wrap gap-x-5 gap-y-3 text-base">
+                  <Link to="/submissions" className="mk-link">
+                    Review submissions
+                  </Link>
+                  <Link to="/viva-sessions" className="mk-link">
+                    Viva sessions
+                  </Link>
+                  <Link to="/students" className="mk-link">
+                    Students
+                  </Link>
+                  <Link to="/reports" className="mk-link">
+                    Reports
+                  </Link>
                 </div>
               </CardBody>
             </Card>
           </div>
 
-          <div className="mt-8">
-            <h2 className="mb-3 text-lg font-semibold text-slate-900">Recent viva sessions</h2>
+          <div className="mt-5">
+            <h2 className="mb-3 font-display text-lg font-semibold text-[var(--color-foreground)]">
+              Recent viva sessions
+            </h2>
             {data.recent_sessions.length === 0 ? (
               <Card>
-                <CardBody className="text-sm text-slate-600">No viva sessions yet.</CardBody>
+                <CardBody className="text-base text-[var(--color-muted)]">No viva sessions yet.</CardBody>
               </Card>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {data.recent_sessions.map((session) => (
-                  <Card key={session.id}>
-                    <CardBody className="flex flex-wrap items-center justify-between gap-3">
+                  <Card key={session.id} hover>
+                    <CardBody className="flex flex-wrap items-center justify-between gap-3 py-4">
                       <div>
                         <Link
                           to={`/viva-sessions/${session.id}`}
-                          className="font-medium text-slate-900 hover:text-blue-700"
+                          className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]"
                         >
                           {session.assignment_title}
                         </Link>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {session.student_name} · {session.questions_asked}/{session.question_budget} questions ·{' '}
-                          {formatDate(session.started_at ?? session.created_at)}
+                        <p className="mt-1 text-sm text-[var(--color-muted)]">
+                          {session.student_name} · {session.questions_asked}/{session.question_budget}{' '}
+                          questions · {formatDate(session.started_at ?? session.created_at)}
                         </p>
                       </div>
-                      <Badge tone={session.state === 'COMPLETED' ? 'success' : session.state === 'FAILED' ? 'danger' : 'info'}>
+                      <Badge
+                        tone={
+                          session.state === 'COMPLETED'
+                            ? 'success'
+                            : session.state === 'FAILED'
+                              ? 'danger'
+                              : 'info'
+                        }
+                      >
                         {session.state}
                       </Badge>
                     </CardBody>

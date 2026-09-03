@@ -68,7 +68,7 @@ export function AssignmentDetailPage() {
             <ul className="space-y-3">
               {(submissions.data || []).slice(0, 8).map((s) => (
                 <li key={s.id} className="flex items-center justify-between gap-3 text-sm">
-                  <Link to={`/submissions/${s.id}`} className="font-medium text-blue-700 hover:underline">
+                  <Link to={`/submissions/${s.id}`} className="mk-link">
                     {s.student_name || s.student_email || 'Student'}
                   </Link>
                   <div className="flex items-center gap-2">

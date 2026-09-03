@@ -89,7 +89,7 @@ export function StudentSlotBookingPage() {
   const grouped = groupByDate(slots)
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
+    <div className="space-y-5">
       <PageHeader title="Book Viva Slot" description="Choose an available time slot for your viva examination" />
 
       {error && (

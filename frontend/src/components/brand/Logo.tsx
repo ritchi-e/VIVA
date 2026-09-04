@@ -33,6 +33,10 @@ export function WordmarkLight({ className }: { className?: string }) {
   return <img src={wordmarkLightUrl} alt={BRAND_NAME} className={cn('h-5 w-auto', className)} />
 }
 
+export function Wordmark({ className }: { className?: string }) {
+  return <img src={wordmarkUrl} alt={BRAND_NAME} className={cn('h-5 w-auto', className)} />
+}
+
 export function LogoMark({ className }: { className?: string }) {
   return <img src={markUrl} alt="" aria-hidden className={cn('h-8 w-auto', className)} />
 }

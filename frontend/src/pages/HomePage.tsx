@@ -4,17 +4,15 @@ import { AnimatePresence, motion, useScroll, useTransform } from 'motion/react'
 import {
   ArrowUpRight,
   BarChart3,
-  Check,
   FileText,
   GitBranch,
   Menu,
   MessagesSquare,
-  Mic,
   ShieldCheck,
   X,
-  Zap,
 } from 'lucide-react'
-import { LogoLight, LogoMarkLight, WordmarkLight } from '@/components/brand/Logo'
+import { Logo, LogoLight, LogoMark, LogoMarkLight, Wordmark, WordmarkLight } from '@/components/brand/Logo'
+import { HomeThemeProvider, HomeThemeToggle, useHomeTheme } from '@/components/landing/theme'
 import { LiquidChrome } from '@/components/landing/LiquidChrome'
 import {
   AsciiGlitch,
@@ -33,14 +31,15 @@ import { CardSwipe, type SwipeCard } from '@/components/landing/CardSwipe'
 import { BentoGrid } from '@/components/landing/Bento'
 import { PricingMatrix } from '@/components/landing/Pricing'
 import { SECTION, SHELL, TYPE } from '@/components/landing/tokens'
+import { AgentRepoReel } from '@/components/landing/AgentRepoReel'
 import { cn } from '@/lib/utils'
 
 const CONTACT_EMAIL = 'hello@mokhik.com'
 
 const NAV = [
-  { href: '#how-it-works', label: 'How it works' },
-  { href: '#showcase', label: 'Showcase' },
   { href: '#platform', label: 'Platform' },
+  { href: '#showcase', label: 'Showcase' },
+  { href: '#how-it-works', label: 'How it works' },
   { href: '#pricing', label: 'Pricing' },
   { href: '#contact', label: 'Contact' },
 ]
@@ -109,6 +108,7 @@ function SectionHead({
 function SiteHeader() {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const { isLight } = useHomeTheme()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -127,22 +127,26 @@ function SiteHeader() {
       <div className={SHELL}>
         <div
           className={cn(
-            'flex h-16 items-center justify-between rounded-full border px-5 transition-all duration-500 sm:px-6',
+            'flex h-16 items-center gap-3 rounded-full border px-5 transition-all duration-500 sm:px-6',
             scrolled
-              ? 'border-white/10 bg-black/65 backdrop-blur-2xl shadow-[0_20px_60px_-30px_rgba(0,0,0,1)]'
+              ? 'border-[color:var(--mk-border)] bg-[color:var(--mk-header)] backdrop-blur-2xl shadow-[0_20px_60px_-30px_rgba(0,0,0,0.35)]'
               : 'border-transparent bg-transparent',
           )}
         >
-          <Link to="/" aria-label="Mokhik home" onClick={() => setOpen(false)}>
-            <LogoLight markClassName="h-7" wordmarkClassName="h-[15px]" />
+          <Link to="/" aria-label="Mokhik home" onClick={() => setOpen(false)} className="shrink-0">
+            {isLight ? (
+              <Logo markClassName="h-7" wordmarkClassName="h-[15px]" />
+            ) : (
+              <LogoLight markClassName="h-7" wordmarkClassName="h-[15px]" />
+            )}
           </Link>
 
-          <nav className="hidden items-center gap-9 md:flex">
+          <nav className="hidden flex-1 items-center justify-center gap-9 md:flex">
             {NAV.map((item) => (
               <a
                 key={item.href}
                 href={item.href}
-                className="group relative text-sm text-white/55 transition-colors hover:text-white"
+                className="group relative text-sm mk-text-55 transition-colors hover:text-[color:var(--mk-nav-hover)]"
               >
                 {item.label}
                 <span className="absolute -bottom-1.5 left-0 h-px w-0 bg-gradient-to-r from-[#2de2b2] to-transparent transition-all duration-400 group-hover:w-full" />
@@ -150,27 +154,31 @@ function SiteHeader() {
             ))}
           </nav>
 
-          <div className="hidden items-center gap-3 md:flex">
-            <Link to="/login" className="text-sm text-white/60 transition-colors hover:text-white">
-              Sign in
-            </Link>
-            <Link to="/register">
-              <GlowButton className="px-5 py-2.5 text-[13px]">
-                Get started
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </GlowButton>
-            </Link>
-          </div>
+          <div className="ml-auto flex items-center gap-2.5 sm:gap-3">
+            <div className="hidden items-center gap-3 md:flex">
+              <Link to="/login" className="text-sm mk-text-60 transition-colors hover:text-[color:var(--mk-nav-hover)]">
+                Sign in
+              </Link>
+              <Link to="/register">
+                <GlowButton className="px-5 py-2.5 text-[13px]">
+                  Get started
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                </GlowButton>
+              </Link>
+            </div>
 
-          <button
-            type="button"
-            aria-label={open ? 'Close menu' : 'Open menu'}
-            aria-expanded={open}
-            onClick={() => setOpen((value) => !value)}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white/70 md:hidden"
-          >
-            {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
+            <button
+              type="button"
+              aria-label={open ? 'Close menu' : 'Open menu'}
+              aria-expanded={open}
+              onClick={() => setOpen((value) => !value)}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--mk-border)] mk-text-70 md:hidden"
+            >
+              {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
+
+            <HomeThemeToggle />
+          </div>
         </div>
 
         <AnimatePresence>
@@ -180,14 +188,14 @@ function SiteHeader() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.3 }}
-              className="mt-2 overflow-hidden rounded-[28px] border border-white/10 bg-black/85 p-5 backdrop-blur-2xl md:hidden"
+              className="mt-2 overflow-hidden rounded-[28px] border border-[color:var(--mk-border)] bg-[color:var(--mk-ink-85)] p-5 backdrop-blur-2xl md:hidden"
             >
               {NAV.map((item) => (
                 <a
                   key={item.href}
                   href={item.href}
                   onClick={() => setOpen(false)}
-                  className="block border-b border-white/5 py-3.5 text-sm text-white/70 last:border-0"
+                  className="block border-b border-[color:var(--mk-border-5)] py-3.5 text-sm mk-text-70 last:border-0"
                 >
                   {item.label}
                 </a>
@@ -195,7 +203,7 @@ function SiteHeader() {
               <div className="mt-4 flex flex-col gap-2.5">
                 <Link
                   to="/login"
-                  className="rounded-full border border-white/12 py-3 text-center text-sm text-white/80"
+                  className="rounded-full border border-[color:var(--mk-border-12)] py-3 text-center text-sm mk-text-80"
                 >
                   Sign in
                 </Link>
@@ -220,6 +228,7 @@ function SiteHeader() {
 
 function Hero() {
   const { scrollY } = useScroll()
+  const { isLight } = useHomeTheme()
   const shaderY = useTransform(scrollY, [0, 900], [0, 220])
   const contentY = useTransform(scrollY, [0, 700], [0, -70])
   const contentOpacity = useTransform(scrollY, [0, 620], [1, 0])
@@ -227,11 +236,16 @@ function Hero() {
   return (
     <section className="relative flex min-h-[100svh] items-center overflow-hidden pt-28">
       <motion.div style={{ y: shaderY }} className="absolute inset-0 -top-24 h-[125%]">
-        <LiquidChrome speed={0.3} />
-        <div className="absolute inset-0 bg-[#030303]/45" />
-        <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#030303] via-[#030303]/85 to-transparent" />
-        <div className="absolute inset-y-0 left-0 w-40 bg-gradient-to-r from-[#030303] to-transparent" />
-        <div className="absolute inset-y-0 right-0 w-40 bg-gradient-to-l from-[#030303] to-transparent" />
+        <LiquidChrome
+          speed={0.3}
+          amplitude={isLight ? 0.34 : 0.42}
+          base={isLight ? [0.78, 0.88, 0.86] : [0.016, 0.072, 0.066]}
+          iris={isLight ? [0.12, 0.55, 0.48] : [0.04, 0.42, 0.34]}
+        />
+        <div className="absolute inset-0 bg-[color:var(--mk-veil)]" />
+        <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[var(--mk-bg)] via-[color:var(--mk-veil-soft)] to-transparent" />
+        <div className="absolute inset-y-0 left-0 w-40 bg-gradient-to-r from-[var(--mk-bg)] to-transparent" />
+        <div className="absolute inset-y-0 right-0 w-40 bg-gradient-to-l from-[var(--mk-bg)] to-transparent" />
       </motion.div>
 
       <GridOverlay className="opacity-60" />
@@ -245,9 +259,9 @@ function Hero() {
             transition={{ duration: 0.9, delay: 0.15 }}
             className="flex justify-center"
           >
-            <span className="inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 backdrop-blur-xl">
-              <LogoMarkLight className="h-4" />
-              <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/55">
+            <span className="inline-flex items-center gap-2.5 rounded-full border border-[color:var(--mk-border)] bg-[color:var(--mk-panel)] px-4 py-2 backdrop-blur-xl">
+              {isLight ? <LogoMark className="h-4" /> : <LogoMarkLight className="h-4" />}
+              <span className="font-mono text-[10px] uppercase tracking-[0.24em] mk-text-55">
                 Oral assessment infrastructure
               </span>
             </span>
@@ -276,7 +290,7 @@ function Hero() {
             className="mt-11 flex flex-col items-center gap-5"
           >
             <DynamicIslandCTA />
-            <a href="#showcase" className="text-sm text-white/40 transition-colors hover:text-white/80">
+            <a href="#showcase" className="text-sm mk-text-40 transition-colors hover:text-[color:var(--mk-fg-80)]">
               or watch a session unfold ↓
             </a>
           </motion.div>
@@ -292,6 +306,7 @@ function Hero() {
  * ------------------------------------------------------------------ */
 
 function TrustStrip() {
+  const { isLight } = useHomeTheme()
   const departments = [
     'Computer Science',
     'Software Engineering',
@@ -302,15 +317,19 @@ function TrustStrip() {
   ]
 
   return (
-    <section className="relative border-b border-white/6 py-16">
+    <section className="relative border-b border-[color:var(--mk-border-6)] py-16">
       <div className={cn(SHELL, 'mb-10')}>
         <p className={cn(TYPE.eyebrow, 'text-center')}>Built for the way faculties assess</p>
       </div>
       <Marquee duration={38} gap="4rem">
         {departments.map((department) => (
           <span key={department} className="flex items-center gap-4 whitespace-nowrap">
-            <LogoMarkLight className="h-5 opacity-35" />
-            <span className="font-display text-lg font-semibold tracking-[-0.02em] text-white/30">
+            {isLight ? (
+              <LogoMark className="h-5 opacity-45" />
+            ) : (
+              <LogoMarkLight className="h-5 opacity-35" />
+            )}
+            <span className="font-display text-lg font-semibold tracking-[-0.02em] mk-text-30">
               {department}
             </span>
           </span>
@@ -320,7 +339,7 @@ function TrustStrip() {
         {MARQUEE_ITEMS.map((item) => (
           <span
             key={item}
-            className="whitespace-nowrap rounded-full border border-white/8 px-5 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-white/35"
+            className="whitespace-nowrap rounded-full border border-[color:var(--mk-border-8)] px-5 py-2 font-mono text-[11px] uppercase tracking-[0.16em] mk-text-35"
           >
             {item}
           </span>
@@ -331,77 +350,8 @@ function TrustStrip() {
 }
 
 /* ------------------------------------------------------------------ *
- * How it works — horizontal flow, GitHub-focused
+ * How it works — cinematic agent reel through a student repo
  * ------------------------------------------------------------------ */
-
-const FLOW_STEPS = [
-  { icon: GitBranch, label: 'Link repo', color: '#2de2b2' },
-  { icon: Zap, label: 'Extract & embed', color: '#7dd3fc' },
-  { icon: Mic, label: 'Adaptive viva', color: '#a78bfa' },
-  { icon: Check, label: 'Evidence report', color: '#f59e0b' },
-]
-
-function GitHubMockTerminal() {
-  const [step, setStep] = useState(0)
-
-  const lines = [
-    { prompt: true, text: 'github.com/alex-morgan/neural-network-report' },
-    { prompt: false, text: '  ├── README.md' },
-    { prompt: false, text: '  ├── src/model.py          → ResNet-18, batch norm, Adam' },
-    { prompt: false, text: '  ├── src/train.py           → 40 epochs, early stopping' },
-    { prompt: false, text: '  ├── notebooks/analysis.ipynb' },
-    { prompt: false, text: '  └── docs/report.pdf' },
-    { prompt: false, text: '' },
-    { prompt: false, text: '  ✓ 23 files indexed · 147 chunks embedded · 3 knowledge nodes' },
-    { prompt: false, text: '  ✓ Question plan: 8 questions across 4 rubric criteria' },
-    { prompt: false, text: '  ✓ Ready for viva' },
-  ]
-
-  useEffect(() => {
-    if (step >= lines.length) return
-    const delay = step === 0 ? 800 : step < 6 ? 180 : step === 6 ? 500 : 400
-    const timer = setTimeout(() => setStep((s) => s + 1), delay)
-    return () => clearTimeout(timer)
-  }, [step, lines.length])
-
-  useEffect(() => {
-    const restart = setInterval(() => setStep(0), 12000)
-    return () => clearInterval(restart)
-  }, [])
-
-  return (
-    <div className="overflow-hidden rounded-2xl border border-white/8 bg-black/60 backdrop-blur-xl">
-      {/* Title bar */}
-      <div className="flex items-center gap-2 border-b border-white/6 px-4 py-2.5">
-        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-        <span className="ml-3 font-mono text-[10px] text-white/30">mokhik — submission ingestion</span>
-      </div>
-
-      <div className="p-5 font-mono text-[12px] leading-[1.9] sm:text-[13px]">
-        {lines.slice(0, step).map((line, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-            className={cn(
-              line.prompt ? 'text-[#7ff5d3]' : 'text-white/40',
-              line.text.startsWith('  ✓') && 'text-[#2de2b2]/80',
-            )}
-          >
-            {line.prompt && <span className="text-white/25">❯ </span>}
-            {line.text}
-          </motion.div>
-        ))}
-        {step < lines.length && (
-          <span className="inline-block h-4 w-1.5 animate-pulse bg-[#2de2b2]/70" />
-        )}
-      </div>
-    </div>
-  )
-}
 
 function HowItWorks() {
   return (
@@ -410,94 +360,40 @@ function HowItWorks() {
       <div className={cn(SHELL, 'relative')}>
         <SectionHead
           eyebrow="How it works"
-          title="Paste a GitHub link. We handle the rest."
-          highlight={['GitHub']}
-          body="Link a repository or upload a document — the system reads every file, embeds the content, plans viva questions grounded in the student's own code, and delivers an evidence-backed assessment to the instructor."
+          title="Their submission becomes the exam script."
+          highlight={['submission', 'exam']}
+          body="Watch the viva agent search a student GitHub repo, open the real training code, lock onto early-stopping evidence, then ask only what it can cite."
         />
 
-        {/* Flow steps */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.7, delay: 0.15 }}
-          className="mx-auto mt-16 max-w-3xl"
+          transition={{ duration: 0.7, delay: 0.1 }}
+          className="mt-16"
         >
-          <div className="flex items-center justify-between">
-            {FLOW_STEPS.map((s, i) => (
-              <div key={s.label} className="flex items-center gap-0 flex-1 last:flex-none">
-                <div className="flex flex-col items-center gap-2.5">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    whileInView={{ scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 + i * 0.12 }}
-                    className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]"
-                    style={{ boxShadow: `0 0 30px -10px ${s.color}40` }}
-                  >
-                    <s.icon className="h-5 w-5" style={{ color: s.color }} />
-                  </motion.div>
-                  <span className="text-[11px] font-medium text-white/50">{s.label}</span>
-                </div>
-                {i < FLOW_STEPS.length - 1 && (
-                  <motion.div
-                    initial={{ scaleX: 0 }}
-                    whileInView={{ scaleX: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: 0.3 + i * 0.12 }}
-                    className="mx-3 mb-6 h-px flex-1 origin-left"
-                    style={{ background: `linear-gradient(to right, ${s.color}40, ${FLOW_STEPS[i + 1].color}40)` }}
-                  />
-                )}
-              </div>
+          <AgentRepoReel />
+          <div className="mt-5 flex flex-wrap items-center gap-2 px-1">
+            <span className="mr-1 font-mono text-[10px] uppercase tracking-[0.18em] mk-text-30">
+              Also accepts
+            </span>
+            {[
+              { icon: GitBranch, label: 'GitHub' },
+              { icon: FileText, label: 'PDF' },
+              { icon: FileText, label: 'DOCX' },
+              { icon: FileText, label: 'PPTX' },
+              { icon: FileText, label: 'ZIP' },
+            ].map((item) => (
+              <span
+                key={item.label}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--mk-border-8)] px-3 py-1.5 text-[11px] mk-text-50"
+              >
+                <item.icon className="h-3 w-3 text-[#2de2b2]/70" />
+                {item.label}
+              </span>
             ))}
           </div>
         </motion.div>
-
-        {/* GitHub terminal + side info */}
-        <div className="mt-16 grid items-start gap-10 lg:grid-cols-[1.3fr_1fr]">
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, delay: 0.2 }}
-          >
-            <GitHubMockTerminal />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, delay: 0.35 }}
-            className="space-y-6"
-          >
-            <div>
-              <h3 className={TYPE.h3}>Every question traces back to their code</h3>
-              <p className={cn('mt-3', TYPE.body)}>
-                The planner reads the repo tree, parses functions and classes, and generates questions
-                it can anchor to a real file and line range. Ungrounded questions are discarded before
-                the student ever sees them.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {[
-                { label: 'Documents', items: 'PDF · DOCX · PPTX · ZIP', icon: FileText },
-                { label: 'Repositories', items: 'Public & private GitHub repos', icon: GitBranch },
-                { label: 'Processing', items: 'Extract → chunk → embed → knowledge graph', icon: Zap },
-              ].map((row) => (
-                <div key={row.label} className="flex items-start gap-3 rounded-xl border border-white/6 bg-white/[0.015] px-4 py-3">
-                  <row.icon className="mt-0.5 h-4 w-4 shrink-0 text-[#2de2b2]/60" />
-                  <div>
-                    <p className="text-[13px] font-medium text-white/70">{row.label}</p>
-                    <p className="text-[12px] text-white/35">{row.items}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
       </div>
     </section>
   )
@@ -523,8 +419,8 @@ function TranscriptVisual({ active }: { active: boolean }) {
           className={cn(
             'max-w-[85%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed',
             line.who === 'student'
-              ? 'ml-auto bg-gradient-to-br from-[#0ebe92]/25 to-[#0ebe92]/10 text-white/85'
-              : 'bg-white/[0.04] text-white/60',
+              ? 'ml-auto bg-gradient-to-br from-[#0ebe92]/25 to-[#0ebe92]/10 mk-text-85'
+              : 'bg-[color:var(--mk-panel-04)] mk-text-60',
           )}
         >
           {line.text}
@@ -537,8 +433,8 @@ function TranscriptVisual({ active }: { active: boolean }) {
 /** The grace window told as a story: focus drops, the student returns, nothing is penalised. */
 function IntegrityVisual({ active }: { active: boolean }) {
   return (
-    <div className="rounded-2xl border border-white/8 bg-black/40 p-5">
-      <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.16em] text-white/30">
+    <div className="rounded-2xl border border-[color:var(--mk-border-8)] bg-[color:var(--mk-ink-40)] p-5">
+      <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.16em] mk-text-30">
         <span>Attention timeline</span>
         <span>14:20 elapsed</span>
       </div>
@@ -566,7 +462,7 @@ function IntegrityVisual({ active }: { active: boolean }) {
         className="mt-5 flex items-start gap-3"
       >
         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
-        <p className="text-xs leading-relaxed text-white/45">
+        <p className="text-xs leading-relaxed mk-text-45">
           <span className="text-amber-300">Focus left the window at 09:41.</span> The student returned
           after 2.4 seconds — inside the grace period, so the viva continued. Recorded in the report,
           not held against them.
@@ -648,7 +544,7 @@ function Showcase() {
 
 function Platform() {
   return (
-    <section id="platform" className={cn(SECTION, 'scroll-mt-24 border-t border-white/6')}>
+    <section id="platform" className={cn(SECTION, 'scroll-mt-24')}>
       <GridOverlay size={72} className="opacity-40" />
       <div className={cn(SHELL, 'relative')}>
         <SectionHead
@@ -675,7 +571,7 @@ function Metrics() {
   ]
 
   return (
-    <section className="relative border-y border-white/6 py-20">
+    <section className="relative border-y border-[color:var(--mk-border-6)] py-20">
       <div className={cn(SHELL, 'grid gap-12 sm:grid-cols-3')}>
         {stats.map((stat, index) => (
           <motion.div
@@ -686,10 +582,10 @@ function Metrics() {
             transition={{ duration: 0.7, delay: index * 0.12 }}
             className="text-center sm:text-left"
           >
-            <p className="font-display text-6xl font-semibold tracking-[-0.05em] text-white">
+            <p className="font-display text-6xl font-semibold tracking-[-0.05em] mk-text">
               <NumberTicker value={stat.value} suffix={stat.suffix} />
             </p>
-            <p className="mt-4 text-sm leading-relaxed text-white/45">{stat.label}</p>
+            <p className="mt-4 text-sm leading-relaxed mk-text-45">{stat.label}</p>
           </motion.div>
         ))}
       </div>
@@ -723,6 +619,7 @@ function Pricing() {
  * ------------------------------------------------------------------ */
 
 function Contact() {
+  const { isLight } = useHomeTheme()
   return (
     <section id="contact" className={cn(SECTION, 'scroll-mt-24')}>
       <div className={cn(SHELL, 'relative')}>
@@ -730,7 +627,7 @@ function Contact() {
           <SpotlightCard className="overflow-hidden px-8 py-20 text-center sm:px-16">
             <RippleRings className="opacity-70" />
             <div className="relative">
-              <LogoMarkLight className="mx-auto h-12" />
+              {isLight ? <LogoMark className="mx-auto h-12" /> : <LogoMarkLight className="mx-auto h-12" />}
               <h2 className={cn('mx-auto mt-9 max-w-2xl', TYPE.h2)}>
                 <WordReveal text="Bring the oral exam back" highlight={['oral']} />
               </h2>
@@ -749,7 +646,7 @@ function Contact() {
                   <GlowButton tone="ghost">Create an account</GlowButton>
                 </Link>
               </div>
-              <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.2em] text-white/30">
+              <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.2em] mk-text-30">
                 <GlitchText text={CONTACT_EMAIL} />
               </p>
             </div>
@@ -767,12 +664,13 @@ function Contact() {
 type FooterLink = { label: string; href: string; internal?: boolean }
 
 function SiteFooter() {
+  const { isLight } = useHomeTheme()
   const columns: { title: string; links: FooterLink[] }[] = [
     {
       title: 'Product',
       links: [
-        { label: 'Showcase', href: '#showcase' },
         { label: 'Platform', href: '#platform' },
+        { label: 'Showcase', href: '#showcase' },
         { label: 'Pricing', href: '#pricing' },
       ],
     },
@@ -793,13 +691,17 @@ function SiteFooter() {
   ]
 
   return (
-    <footer className="relative overflow-hidden border-t border-white/6">
+    <footer className="relative overflow-hidden border-t border-[color:var(--mk-border-6)]">
       <AsciiGlitch className="mk-grid-fade" opacity={0.14} />
       <div className={cn(SHELL, 'relative py-20')}>
         <div className="grid gap-14 lg:grid-cols-[1.4fr_2fr]">
           <div>
-            <LogoLight markClassName="h-9" wordmarkClassName="h-5" />
-            <p className="mt-5 max-w-xs text-sm leading-relaxed text-white/40">
+            {isLight ? (
+              <Logo markClassName="h-9" wordmarkClassName="h-5" />
+            ) : (
+              <LogoLight markClassName="h-9" wordmarkClassName="h-5" />
+            )}
+            <p className="mt-5 max-w-xs text-sm leading-relaxed mk-text-40">
               Oral assessment infrastructure that stays grounded in the student's own work.
             </p>
           </div>
@@ -807,18 +709,18 @@ function SiteFooter() {
           <div className="grid grid-cols-2 gap-10 sm:grid-cols-3">
             {columns.map((column) => (
               <div key={column.title}>
-                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/30">
+                <p className="font-mono text-[10px] uppercase tracking-[0.22em] mk-text-30">
                   {column.title}
                 </p>
                 <ul className="mt-5 space-y-3.5">
                   {column.links.map((link) => (
                     <li key={link.label}>
                       {link.internal ? (
-                        <Link to={link.href} className="text-sm text-white/55 transition-colors hover:text-[#7ff5d3]">
+                        <Link to={link.href} className="text-sm mk-text-55 transition-colors hover:text-[#7ff5d3]">
                           {link.label}
                         </Link>
                       ) : (
-                        <a href={link.href} className="text-sm text-white/55 transition-colors hover:text-[#7ff5d3]">
+                        <a href={link.href} className="text-sm mk-text-55 transition-colors hover:text-[#7ff5d3]">
                           {link.label}
                         </a>
                       )}
@@ -830,9 +732,13 @@ function SiteFooter() {
           </div>
         </div>
 
-        <div className="mt-16 flex flex-col gap-6 border-t border-white/6 pt-8 sm:flex-row sm:items-end sm:justify-between">
-          <WordmarkLight className="h-8 opacity-10" />
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/25">
+        <div className="mt-16 flex flex-col gap-6 border-t border-[color:var(--mk-border-6)] pt-8 sm:flex-row sm:items-end sm:justify-between">
+          {isLight ? (
+            <Wordmark className="h-8 opacity-15" />
+          ) : (
+            <WordmarkLight className="h-8 opacity-10" />
+          )}
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] mk-text-25">
             © {new Date().getFullYear()} Mokhik — All rights reserved
           </p>
         </div>
@@ -847,12 +753,6 @@ function SiteFooter() {
 
 export function HomePage() {
   useEffect(() => {
-    // The app shell is a light theme; scope the ink background to this route only.
-    document.body.classList.add('mk-dark')
-    return () => document.body.classList.remove('mk-dark')
-  }, [])
-
-  useEffect(() => {
     // The router owns the URL, so a hash deep link has to be resolved after mount.
     const { hash } = window.location
     if (!hash || hash.length < 2) return
@@ -861,14 +761,29 @@ export function HomePage() {
   }, [])
 
   return (
-    <div className="relative min-h-screen overflow-x-clip bg-[#030303] text-white">
+    <HomeThemeProvider>
+      <HomePageCanvas />
+    </HomeThemeProvider>
+  )
+}
+
+function HomePageCanvas() {
+  const { theme } = useHomeTheme()
+
+  return (
+    <div
+      className={cn(
+        'mk-home relative min-h-screen overflow-x-clip',
+        theme === 'light' ? 'mk-theme-light' : 'mk-theme-dark',
+      )}
+    >
       <SiteHeader />
       <main>
         <Hero />
         <TrustStrip />
+        <Platform />
         <Showcase />
         <HowItWorks />
-        <Platform />
         <Metrics />
         <Pricing />
         <Contact />

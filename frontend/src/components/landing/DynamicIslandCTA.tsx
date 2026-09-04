@@ -33,7 +33,7 @@ export function DynamicIslandCTA({ to = '/register', className }: { to?: string;
       onHoverEnd={() => setOpen(false)}
       transition={{ type: 'spring', stiffness: 320, damping: 30, mass: 0.7 }}
       className={cn(
-        'relative inline-flex items-center overflow-hidden rounded-full border border-white/10 bg-black/70 p-1.5 backdrop-blur-2xl',
+        'relative inline-flex items-center overflow-hidden rounded-full border border-[color:var(--mk-border)] bg-[color:var(--mk-ink-70)] p-1.5 backdrop-blur-2xl',
         'shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_70px_-30px_rgba(45,226,178,0.65)]',
         className,
       )}
@@ -56,7 +56,7 @@ export function DynamicIslandCTA({ to = '/register', className }: { to?: string;
               Start your first viva
               <ArrowUpRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </Link>
-            <span className="whitespace-nowrap px-3 pr-4 text-xs text-white/45">Free · no card</span>
+            <span className="whitespace-nowrap px-3 pr-4 text-xs mk-text-45">Free · no card</span>
           </motion.div>
         ) : (
           <motion.div
@@ -72,8 +72,8 @@ export function DynamicIslandCTA({ to = '/register', className }: { to?: string;
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#2de2b2] opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-[#2de2b2]" />
             </span>
-            <active.icon className="h-4 w-4 text-white/60" />
-            <span className="whitespace-nowrap text-sm text-white/70">{active.label}</span>
+            <active.icon className="h-4 w-4 mk-text-60" />
+            <span className="whitespace-nowrap text-sm mk-text-70">{active.label}</span>
           </motion.div>
         )}
       </AnimatePresence>

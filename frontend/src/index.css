@@ -40,11 +40,19 @@
     @apply border-[var(--color-border)];
   }
 
-  /* Landing route opts the document into the dark brand canvas. */
+  /* Landing route themes (scoped via .mk-home on the page root). */
   body.mk-dark {
     background-color: #030303;
     background-image: none;
     color: #ffffff;
+  }
+
+  body.mk-light {
+    background-color: #eef3f4;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 0% -10%, rgba(7, 111, 101, 0.1), transparent),
+      radial-gradient(ellipse 55% 40% at 100% 0%, rgba(14, 190, 146, 0.08), transparent);
+    color: #0b1520;
   }
 
   h1,
@@ -121,6 +129,134 @@
 
   .animate-mk-drawer {
     animation: mk-drawer-in 0.22s ease-out both;
+  }
+
+  /* ---------- landing page theme tokens ---------- */
+
+  .mk-home {
+    --mk-bg: #030303;
+    --mk-fg: #ffffff;
+    --mk-fg-85: rgba(255, 255, 255, 0.85);
+    --mk-fg-80: rgba(255, 255, 255, 0.8);
+    --mk-fg-70: rgba(255, 255, 255, 0.7);
+    --mk-fg-65: rgba(255, 255, 255, 0.65);
+    --mk-fg-60: rgba(255, 255, 255, 0.6);
+    --mk-fg-55: rgba(255, 255, 255, 0.55);
+    --mk-fg-50: rgba(255, 255, 255, 0.5);
+    --mk-fg-45: rgba(255, 255, 255, 0.45);
+    --mk-fg-40: rgba(255, 255, 255, 0.4);
+    --mk-fg-35: rgba(255, 255, 255, 0.35);
+    --mk-fg-30: rgba(255, 255, 255, 0.3);
+    --mk-fg-25: rgba(255, 255, 255, 0.25);
+    --mk-border: rgba(255, 255, 255, 0.1);
+    --mk-border-12: rgba(255, 255, 255, 0.12);
+    --mk-border-8: rgba(255, 255, 255, 0.08);
+    --mk-border-6: rgba(255, 255, 255, 0.06);
+    --mk-border-5: rgba(255, 255, 255, 0.05);
+    --mk-panel: rgba(255, 255, 255, 0.03);
+    --mk-panel-soft: rgba(255, 255, 255, 0.025);
+    --mk-panel-04: rgba(255, 255, 255, 0.04);
+    --mk-panel-015: rgba(255, 255, 255, 0.015);
+    --mk-ink: rgba(0, 0, 0, 1);
+    --mk-ink-85: rgba(0, 0, 0, 0.85);
+    --mk-ink-70: rgba(0, 0, 0, 0.7);
+    --mk-ink-65: rgba(0, 0, 0, 0.65);
+    --mk-ink-60: rgba(0, 0, 0, 0.6);
+    --mk-ink-40: rgba(0, 0, 0, 0.4);
+    --mk-veil: rgba(3, 3, 3, 0.45);
+    --mk-veil-soft: rgba(3, 3, 3, 0.85);
+    --mk-card-solid: #070707;
+    --mk-header: rgba(0, 0, 0, 0.65);
+    --mk-grid: rgba(255, 255, 255, 0.055);
+    --mk-nav-hover: #ffffff;
+    --mk-featured-bg: #061412;
+    --mk-featured-fg: #f4fffb;
+    --mk-featured-muted: rgba(244, 255, 251, 0.62);
+    --mk-featured-soft: rgba(244, 255, 251, 0.45);
+    color: var(--mk-fg);
+    background-color: var(--mk-bg);
+  }
+
+  .mk-home.mk-theme-light {
+    --mk-bg: #eef3f4;
+    --mk-fg: #0b1520;
+    --mk-fg-85: rgba(11, 21, 32, 0.88);
+    --mk-fg-80: rgba(11, 21, 32, 0.82);
+    --mk-fg-70: rgba(11, 21, 32, 0.72);
+    --mk-fg-65: rgba(11, 21, 32, 0.66);
+    --mk-fg-60: rgba(11, 21, 32, 0.6);
+    --mk-fg-55: rgba(11, 21, 32, 0.56);
+    --mk-fg-50: rgba(11, 21, 32, 0.5);
+    --mk-fg-45: rgba(11, 21, 32, 0.46);
+    --mk-fg-40: rgba(11, 21, 32, 0.4);
+    --mk-fg-35: rgba(11, 21, 32, 0.36);
+    --mk-fg-30: rgba(11, 21, 32, 0.32);
+    --mk-fg-25: rgba(11, 21, 32, 0.28);
+    --mk-border: rgba(11, 21, 32, 0.12);
+    --mk-border-12: rgba(11, 21, 32, 0.14);
+    --mk-border-8: rgba(11, 21, 32, 0.1);
+    --mk-border-6: rgba(11, 21, 32, 0.08);
+    --mk-border-5: rgba(11, 21, 32, 0.06);
+    --mk-panel: rgba(255, 255, 255, 0.72);
+    --mk-panel-soft: rgba(255, 255, 255, 0.8);
+    --mk-panel-04: rgba(7, 111, 101, 0.05);
+    --mk-panel-015: rgba(7, 111, 101, 0.03);
+    --mk-ink: rgba(255, 255, 255, 1);
+    --mk-ink-85: rgba(255, 255, 255, 0.92);
+    --mk-ink-70: rgba(255, 255, 255, 0.78);
+    --mk-ink-65: rgba(255, 255, 255, 0.86);
+    --mk-ink-60: rgba(255, 255, 255, 0.7);
+    --mk-ink-40: rgba(255, 255, 255, 0.55);
+    --mk-veil: rgba(238, 243, 244, 0.55);
+    --mk-veil-soft: rgba(238, 243, 244, 0.9);
+    --mk-card-solid: #ffffff;
+    --mk-header: rgba(255, 255, 255, 0.86);
+    --mk-grid: rgba(7, 111, 101, 0.08);
+    --mk-nav-hover: #076f65;
+    --mk-featured-bg: #ffffff;
+    --mk-featured-fg: #0b1520;
+    --mk-featured-muted: rgba(11, 21, 32, 0.62);
+    --mk-featured-soft: rgba(11, 21, 32, 0.48);
+  }
+
+  .mk-text {
+    color: var(--mk-fg);
+  }
+  .mk-text-85 {
+    color: var(--mk-fg-85);
+  }
+  .mk-text-80 {
+    color: var(--mk-fg-80);
+  }
+  .mk-text-70 {
+    color: var(--mk-fg-70);
+  }
+  .mk-text-65 {
+    color: var(--mk-fg-65);
+  }
+  .mk-text-60 {
+    color: var(--mk-fg-60);
+  }
+  .mk-text-55 {
+    color: var(--mk-fg-55);
+  }
+  .mk-text-50 {
+    color: var(--mk-fg-50);
+  }
+  .mk-text-45 {
+    color: var(--mk-fg-45);
+  }
+  .mk-text-40 {
+    color: var(--mk-fg-40);
+  }
+  .mk-text-35 {
+    color: var(--mk-fg-35);
+  }
+  .mk-text-30 {
+    color: var(--mk-fg-30);
+  }
+  .mk-text-25 {
+    color: var(--mk-fg-25);
   }
 
   /* ---------- landing page effects ---------- */

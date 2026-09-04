@@ -1,7 +1,6 @@
 /**
  * Single source of truth for the landing page's visual scale.
- * Sections compose these strings instead of hand-writing spacing or radii,
- * so the rhythm stays identical across every block on the page.
+ * Colors come from `.mk-home` CSS variables so dark/light themes stay in sync.
  */
 
 export const BRAND = {
@@ -24,18 +23,18 @@ export const RADIUS = {
 } as const
 
 export const TYPE = {
-  eyebrow: 'text-[11px] font-medium uppercase tracking-[0.32em] text-white/45',
+  eyebrow: 'text-[11px] font-medium uppercase tracking-[0.32em] mk-text-45',
   display:
-    'font-display text-[clamp(2.75rem,7vw,5.5rem)] font-semibold leading-[0.94] tracking-[-0.045em] text-white',
-  h2: 'font-display text-[clamp(2rem,4.2vw,3.25rem)] font-semibold leading-[1.02] tracking-[-0.035em] text-white',
-  h3: 'font-display text-xl font-semibold tracking-[-0.02em] text-white',
-  lead: 'text-base leading-[1.7] text-white/55 sm:text-lg',
-  body: 'text-sm leading-[1.75] text-white/50',
+    'font-display text-[clamp(2.75rem,7vw,5.5rem)] font-semibold leading-[0.94] tracking-[-0.045em] mk-text',
+  h2: 'font-display text-[clamp(2rem,4.2vw,3.25rem)] font-semibold leading-[1.02] tracking-[-0.035em] mk-text',
+  h3: 'font-display text-xl font-semibold tracking-[-0.02em] mk-text',
+  lead: 'text-base leading-[1.7] mk-text-55 sm:text-lg',
+  body: 'text-sm leading-[1.75] mk-text-50',
   mono: 'font-mono text-[11px] uppercase tracking-[0.18em]',
 } as const
 
 /** Frosted panel used by every card on the page. */
 export const SURFACE =
-  'border border-white/8 bg-white/[0.025] backdrop-blur-xl shadow-[0_1px_0_0_rgba(255,255,255,0.06)_inset,0_30px_80px_-40px_rgba(0,0,0,0.9)]'
+  'border border-[color:var(--mk-border-8)] bg-[color:var(--mk-panel-soft)] backdrop-blur-xl shadow-[0_1px_0_0_rgba(255,255,255,0.06)_inset,0_30px_80px_-40px_rgba(0,0,0,0.18)]'
 
-export const HAIRLINE = 'border-white/8'
+export const HAIRLINE = 'border-[color:var(--mk-border-8)]'

@@ -55,7 +55,7 @@ export function CardSwipe({ cards }: { cards: SwipeCard[] }) {
               transition={{ type: 'spring', stiffness: 220, damping: 30 }}
               onClick={() => !active && go(cardIndex)}
               className={cn(
-                'absolute inset-0 mx-auto w-full max-w-3xl overflow-hidden border border-white/10 bg-[#070707]',
+                'absolute inset-0 mx-auto w-full max-w-3xl overflow-hidden border border-[color:var(--mk-border)] bg-[var(--mk-card-solid)]',
                 RADIUS.card,
                 active ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
                 'shadow-[0_60px_140px_-60px_rgba(0,0,0,1)]',
@@ -78,10 +78,10 @@ export function CardSwipe({ cards }: { cards: SwipeCard[] }) {
               <div className="relative flex h-full flex-col justify-between p-8 sm:p-11">
                 <div className="flex items-start justify-between gap-6">
                   <div>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/40">
+                    <p className="font-mono text-[11px] uppercase tracking-[0.22em] mk-text-40">
                       {card.kicker}
                     </p>
-                    <h3 className="mt-4 max-w-md font-display text-2xl font-semibold leading-tight tracking-[-0.03em] text-white sm:text-[2rem]">
+                    <h3 className="mt-4 max-w-md font-display text-2xl font-semibold leading-tight tracking-[-0.03em] mk-text sm:text-[2rem]">
                       <AnimatePresence mode="wait">
                         {active ? (
                           <motion.span
@@ -99,10 +99,10 @@ export function CardSwipe({ cards }: { cards: SwipeCard[] }) {
                         )}
                       </AnimatePresence>
                     </h3>
-                    <p className="mt-4 max-w-lg text-sm leading-[1.75] text-white/50">{card.body}</p>
+                    <p className="mt-4 max-w-lg text-sm leading-[1.75] mk-text-50">{card.body}</p>
                   </div>
                   <span
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--mk-border)]"
                     style={{ background: `${card.accent}14`, color: card.accent }}
                   >
                     <card.icon className="h-5 w-5" />
@@ -121,7 +121,7 @@ export function CardSwipe({ cards }: { cards: SwipeCard[] }) {
           type="button"
           aria-label="Previous"
           onClick={() => go(index - 1)}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 text-white/60 transition hover:border-white/25 hover:text-white"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--mk-border)] mk-text-60 transition hover:border-[color:var(--mk-fg-25)] hover:text-[color:var(--mk-nav-hover)]"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
@@ -136,7 +136,7 @@ export function CardSwipe({ cards }: { cards: SwipeCard[] }) {
               className="h-1.5 rounded-full transition-all duration-500"
               style={{
                 width: dotIndex === index ? 38 : 10,
-                background: dotIndex === index ? '#2de2b2' : 'rgba(255,255,255,0.18)',
+                background: dotIndex === index ? '#2de2b2' : 'var(--mk-fg-30)',
               }}
             />
           ))}
@@ -146,7 +146,7 @@ export function CardSwipe({ cards }: { cards: SwipeCard[] }) {
           type="button"
           aria-label="Next"
           onClick={() => go(index + 1)}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 text-white/60 transition hover:border-white/25 hover:text-white"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--mk-border)] mk-text-60 transition hover:border-[color:var(--mk-fg-25)] hover:text-[color:var(--mk-nav-hover)]"
         >
           <ArrowRight className="h-4 w-4" />
         </button>

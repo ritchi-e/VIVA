@@ -21,7 +21,7 @@ function CardShell({
 }) {
   return (
     <div className={cn('flex h-full flex-col p-7 sm:p-8', className)}>
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-[#2de2b2]">
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[color:var(--mk-border)] bg-[color:var(--mk-panel)] text-[#2de2b2]">
         <Icon className="h-4.5 w-4.5" />
       </span>
       <h3 className={cn('mt-6', TYPE.h3)}>{title}</h3>
@@ -34,11 +34,11 @@ function CardShell({
 /** Evidence trace: a question resolving to the exact symbol it came from. */
 function EvidenceTrace() {
   return (
-    <div className="rounded-2xl border border-white/8 bg-black/40 p-4 font-mono text-[11px] leading-relaxed">
+    <div className="rounded-2xl border border-[color:var(--mk-border-8)] bg-[color:var(--mk-ink-40)] p-4 font-mono text-[11px] leading-relaxed">
       {[
-        { label: 'question', value: 'Why invalidate past the edit offset?', tone: 'text-white/70' },
+        { label: 'question', value: 'Why invalidate past the edit offset?', tone: 'mk-text-70' },
         { label: 'source', value: 'parser/lexer.py :: TokenCache.invalidate', tone: 'text-[#7ff5d3]' },
-        { label: 'commit', value: 'a91f0c3 · 14 lines changed', tone: 'text-white/40' },
+        { label: 'commit', value: 'a91f0c3 · 14 lines changed', tone: 'mk-text-40' },
       ].map((row, index) => (
         <motion.div
           key={row.label}
@@ -48,7 +48,7 @@ function EvidenceTrace() {
           transition={{ delay: 0.15 + index * 0.12, duration: 0.5 }}
           className="flex gap-3 py-1"
         >
-          <span className="w-16 shrink-0 uppercase tracking-[0.14em] text-white/25">{row.label}</span>
+          <span className="w-16 shrink-0 uppercase tracking-[0.14em] mk-text-25">{row.label}</span>
           <span className={row.tone}>{row.value}</span>
         </motion.div>
       ))}
@@ -85,7 +85,7 @@ function GraceCountdown() {
     >
       <span className="relative flex h-16 w-16 items-center justify-center">
         <svg viewBox="0 0 64 64" className="absolute h-16 w-16 -rotate-90">
-          <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="3" />
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--mk-border)" strokeWidth="3" />
           <motion.circle
             cx="32"
             cy="32"
@@ -99,11 +99,11 @@ function GraceCountdown() {
             transition={{ duration: 0.9, ease: 'linear' }}
           />
         </svg>
-        <span className={cn('font-display text-lg font-semibold', armed ? 'text-amber-300' : 'text-white/70')}>
+        <span className={cn('font-display text-lg font-semibold', armed ? 'text-amber-300' : 'mk-text-70')}>
           {armed ? seconds : '5s'}
         </span>
       </span>
-      <span className="text-xs leading-relaxed text-white/45">
+      <span className="text-xs leading-relaxed mk-text-45">
         {armed ? 'Return to the window or the session ends and the instructor is notified.' : 'Hover to arm the grace window.'}
       </span>
     </button>
@@ -142,9 +142,9 @@ function RubricBars() {
     <div className="space-y-3.5">
       {rows.map((row, index) => (
         <div key={row.label}>
-          <div className="flex justify-between text-[11px] text-white/45">
+          <div className="flex justify-between text-[11px] mk-text-45">
             <span>{row.label}</span>
-            <span className="tabular-nums text-white/70">{(row.value / 10).toFixed(1)}</span>
+            <span className="tabular-nums mk-text-70">{(row.value / 10).toFixed(1)}</span>
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/8">
             <motion.div
@@ -175,18 +175,18 @@ export function BentoGrid() {
       </SpotlightCard>
 
       <ShineBorder className="h-full" duration={9}>
-        <div className="flex h-full flex-col justify-between rounded-[27px] bg-[#060606] p-8">
-          <p className={TYPE.eyebrow}>Grounding rate</p>
+        <div className="flex h-full flex-col justify-between rounded-[27px] border border-[#2de2b2]/30 bg-[color:var(--mk-featured-bg)] p-8 shadow-[0_24px_60px_-36px_rgba(14,190,146,0.45)]">
+          <p className={cn(TYPE.eyebrow, 'text-[color:var(--mk-featured-soft)]')}>Grounding rate</p>
           <div>
-            <p className="font-display text-[4.5rem] font-semibold leading-none tracking-[-0.05em] text-white">
+            <p className="font-display text-[4.5rem] font-semibold leading-none tracking-[-0.05em] text-[color:var(--mk-featured-fg)]">
               <NumberTicker value={100} suffix="%" />
             </p>
-            <p className="mt-4 text-sm leading-relaxed text-white/50">
+            <p className="mt-4 text-sm leading-relaxed text-[color:var(--mk-featured-muted)]">
               of shipped questions cite a location in the submission. Ungrounded drafts never reach the student.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-white/35">
-            <Gauge className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-2 text-[11px] text-[color:var(--mk-featured-soft)]">
+            <Gauge className="h-3.5 w-3.5 text-[#2de2b2]" />
             <WordReveal text="Checked at plan time and again live" />
           </div>
         </div>

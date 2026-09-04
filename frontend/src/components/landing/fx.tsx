@@ -129,7 +129,7 @@ export function SpotlightCard({
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-8 -top-px h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
+        className="pointer-events-none absolute inset-x-8 -top-px h-px bg-gradient-to-r from-transparent via-[color:var(--mk-fg-25)] to-transparent"
       />
       {children}
     </div>
@@ -206,7 +206,7 @@ export function GlowButton({
         RADIUS.pill,
         tone === 'primary'
           ? 'bg-gradient-to-b from-[#3fe9bd] to-[#0ebe92] text-[#03231e] shadow-[0_0_0_1px_rgba(45,226,178,0.5),0_18px_50px_-18px_rgba(14,190,146,0.9)]'
-          : 'border border-white/12 bg-white/[0.03] text-white/85 backdrop-blur-xl hover:bg-white/[0.07]',
+          : 'border border-[color:var(--mk-border-12)] bg-[color:var(--mk-panel)] mk-text-85 backdrop-blur-xl hover:bg-[color:var(--mk-panel-04)]',
         className,
       )}
     >
@@ -232,7 +232,7 @@ export function GridOverlay({ className, size = 56 }: { className?: string; size
       className={cn('mk-grid-fade pointer-events-none absolute inset-0', className)}
       style={{
         backgroundImage:
-          'linear-gradient(to right, rgba(255,255,255,0.055) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.055) 1px, transparent 1px)',
+          'linear-gradient(to right, var(--mk-grid) 1px, transparent 1px), linear-gradient(to bottom, var(--mk-grid) 1px, transparent 1px)',
         backgroundSize: `${size}px ${size}px`,
       }}
     />
@@ -246,7 +246,7 @@ export function RippleRings({ className, count = 5 }: { className?: string; coun
         {Array.from({ length: count }).map((_, index) => (
           <span
             key={index}
-            className="absolute left-1/2 top-1/2 block -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10"
+            className="absolute left-1/2 top-1/2 block -translate-x-1/2 -translate-y-1/2 rounded-full border border-[color:var(--mk-border)]"
             style={{
               width: 220 + index * 190,
               height: 220 + index * 190,

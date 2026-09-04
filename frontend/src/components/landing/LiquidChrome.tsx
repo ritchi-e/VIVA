@@ -160,6 +160,8 @@ export function LiquidChrome({
 
       gl.uniform1f(uTime, elapsed)
       gl.uniform2f(uPointer, pointer.x, pointer.y)
+      gl.uniform3fv(gl.getUniformLocation(program, 'uBase'), paletteRef.current.base)
+      gl.uniform3fv(gl.getUniformLocation(program, 'uIris'), paletteRef.current.iris)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
     }
     raf = requestAnimationFrame(render)

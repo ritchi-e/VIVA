@@ -265,9 +265,8 @@ function Hero() {
             transition={{ duration: 0.9, delay: 0.85 }}
             className={cn('mx-auto mt-8 max-w-xl', TYPE.lead)}
           >
-            Students upload documents or link their GitHub repo. Mokhik reads the submission,
-            runs an adaptive spoken viva grounded in their own work, and returns evidence-linked
-            rubric scores for you to review.
+            Mokhik is evidence-grounded oral assessment for computing education—helping instructors
+            validate authentic understanding behind submitted work.
           </motion.p>
 
           <motion.div
@@ -654,8 +653,8 @@ function Platform() {
       <div className={cn(SHELL, 'relative')}>
         <SectionHead
           eyebrow="The platform"
-          title="Four systems, one defensible grade"
-          highlight={['defensible']}
+          title="More signal for educators. Less guesswork about authorship."
+          highlight={['signal', 'authorship']}
           body="Grounding, speech, integrity, and scoring are separate subsystems that each refuse to guess."
         />
         <BentoGrid />
@@ -736,8 +735,8 @@ function Contact() {
                 <WordReveal text="Bring the oral exam back" highlight={['oral']} />
               </h2>
               <p className={cn('mx-auto mt-6 max-w-lg', TYPE.lead)}>
-                Send us one assignment. We will run a Mokhik viva on it and walk you through the report
-                it produces.
+                Tell us what your program is assessing and where review gets difficult. We’ll show you
+                where Mokhik can help.
               </p>
               <div className="mt-11 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <a href={`mailto:${CONTACT_EMAIL}?subject=Mokhik%20demo`}>

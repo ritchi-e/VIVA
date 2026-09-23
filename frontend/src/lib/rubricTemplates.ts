@@ -19,6 +19,11 @@ export type RubricTemplate = {
   criteriaKeys: string[]
 }
 
+export type RubricCategoryFilter = {
+  id: string
+  label: string
+}
+
 function c(
   key: string,
   name: string,
@@ -141,6 +146,28 @@ export const CRITERION_LIBRARY: RubricCriterionDraft[] = [
 const libraryByKey = Object.fromEntries(CRITERION_LIBRARY.map((x) => [x.key, x]))
 const libraryByName = Object.fromEntries(CRITERION_LIBRARY.map((x) => [x.name.toLowerCase(), x]))
 
+/** Balanced default: strong criteria spanning every category. */
+export const DEFAULT_CRITERION_KEYS = [
+  'conceptual',
+  'methodology',
+  'implementation',
+  'testing',
+  'results',
+  'critical',
+  'communication',
+  'oral_defense',
+] as const
+
+export const RUBRIC_CATEGORIES: RubricCategoryFilter[] = [
+  { id: 'all', label: 'All' },
+  { id: 'conceptual', label: 'Conceptual' },
+  { id: 'methodology', label: 'Methodology' },
+  { id: 'implementation', label: 'Implementation' },
+  { id: 'results', label: 'Results' },
+  { id: 'critical_thinking', label: 'Critical thinking' },
+  { id: 'communication', label: 'Communication' },
+]
+
 export const RUBRIC_TEMPLATES: RubricTemplate[] = [
   {
     id: 'general_project',
@@ -186,16 +213,24 @@ export const RUBRIC_TEMPLATES: RubricTemplate[] = [
   },
 ]
 
-export function criteriaFromTemplate(templateId: string): RubricCriterionDraft[] {
-  const template = RUBRIC_TEMPLATES.find((t) => t.id === templateId)
-  if (!template) return []
-  return template.criteriaKeys
+export function criteriaFromKeys(keys: readonly string[]): RubricCriterionDraft[] {
+  return keys
     .map((key, i) => {
       const base = libraryByKey[key]
       if (!base) return null
       return { ...base, order: i }
     })
     .filter(Boolean) as RubricCriterionDraft[]
+}
+
+export function defaultBestCriteria(): RubricCriterionDraft[] {
+  return criteriaFromKeys(DEFAULT_CRITERION_KEYS)
+}
+
+export function criteriaFromTemplate(templateId: string): RubricCriterionDraft[] {
+  const template = RUBRIC_TEMPLATES.find((t) => t.id === templateId)
+  if (!template) return []
+  return criteriaFromKeys(template.criteriaKeys)
 }
 
 export function matchTemplateId(criteria: { name: string }[]): string | null {
@@ -211,7 +246,15 @@ export function matchTemplateId(criteria: { name: string }[]): string | null {
 }
 
 export function draftsFromSaved(
-  criteria: { id?: string; name: string; description?: string; category?: string; weight?: string | number; max_score?: string | number; order?: number }[],
+  criteria: {
+    id?: string
+    name: string
+    description?: string
+    category?: string
+    weight?: string | number
+    max_score?: string | number
+    order?: number
+  }[],
 ): RubricCriterionDraft[] {
   return criteria.map((c, i) => {
     const known = libraryByName[c.name.toLowerCase()]

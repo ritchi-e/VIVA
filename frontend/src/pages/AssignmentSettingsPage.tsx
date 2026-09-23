@@ -41,6 +41,7 @@ export function AssignmentSettingsPage() {
     const data = assignment.data
     const existing = rubric.data.criteria || []
     const budget = Number((data.viva_config as { question_budget?: number } | undefined)?.question_budget)
+    const points = Number((data.viva_config as { total_points?: number } | undefined)?.total_points)
     setValues(
       defaultSetupValues({
         courseId: data.course,
@@ -53,7 +54,8 @@ export function AssignmentSettingsPage() {
         allowZip: data.allow_zip,
         allowGithub: data.allow_github,
         questionBudget: Number.isFinite(budget) && budget > 0 ? budget : 8,
-        templateId: existing.length ? matchTemplateId(existing) : 'general_project',
+        totalPoints: Number.isFinite(points) && points > 0 ? points : 100,
+        templateId: existing.length ? matchTemplateId(existing) : null,
         criteria: existing.length ? draftsFromSaved(existing) : defaultSetupValues().criteria,
       }),
     )
@@ -88,7 +90,11 @@ export function AssignmentSettingsPage() {
       allow_pptx: values.allowPptx,
       allow_zip: values.allowZip,
       allow_github: values.allowGithub,
-      viva_config: { ...(assignment.data.viva_config || {}), question_budget: values.questionBudget },
+      viva_config: {
+        ...(assignment.data.viva_config || {}),
+        question_budget: values.questionBudget,
+        total_points: values.totalPoints,
+      },
     })
     await rubricsApi.replaceCriteria(id, rubricPayloadFromSetup(values))
   }

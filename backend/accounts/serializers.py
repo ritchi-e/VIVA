@@ -9,7 +9,11 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("id", "email", "full_name", "email_verified", "avatar_url", "date_joined")
-        read_only_fields = fields
+        read_only_fields = ("id", "email", "email_verified", "avatar_url", "date_joined")
+
+
+class ProfileUpdateSerializer(serializers.Serializer):
+    full_name = serializers.CharField(max_length=255, allow_blank=True, required=False)
 
 
 class RegisterSerializer(serializers.Serializer):

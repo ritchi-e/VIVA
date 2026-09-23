@@ -301,6 +301,10 @@ export function StudentAssignmentDetailPage() {
   const assessment = results.data
   const overall = assessment?.overall_score ?? assessment?.ai_overall_score
   const previewSubmission = submissionDetail.data || latestSubmission
+  const totalPoints = Number(
+    (assignment.data.viva_config as { total_points?: number } | undefined)?.total_points,
+  )
+  const pointsLabel = Number.isFinite(totalPoints) && totalPoints > 0 ? `${totalPoints} points` : null
 
   const upload = async () => {
     if (!canUpload) return
@@ -353,7 +357,11 @@ export function StudentAssignmentDetailPage() {
 
       <PageHeader
         title={assignment.data.title}
-        description="Read the brief, submit once, then book your viva."
+        description={
+          pointsLabel
+            ? `${pointsLabel} · Read the brief, submit once, then book your viva.`
+            : 'Read the brief, submit once, then book your viva.'
+        }
         actions={
           <Link to={backTo} className="mk-link text-sm">
             Back to class

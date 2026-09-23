@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Home, LogOut, Menu, Plus, Settings, Shield, UserPlus, X } from 'lucide-react'
+import { Home, LogOut, Menu, Plus, Settings, Shield, X } from 'lucide-react'
 import { LogoMark } from '@/components/brand/Logo'
 import wordmarkUrl from '@/assets/mokhik-wordmark.png'
 import { useAuth } from '@/context/AuthContext'
@@ -230,7 +230,8 @@ function InstructorSidebar({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function StudentSidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { activeMembership } = useAuth()
+  const navigate = useNavigate()
+  const { logout, activeMembership } = useAuth()
   const location = useLocation()
   const courses = useAsync(
     () => coursesApi.list(),
@@ -252,19 +253,10 @@ function StudentSidebar({ onNavigate }: { onNavigate?: () => void }) {
         </p>
         <HomeNavLink to="/student/dashboard" onNavigate={onNavigate} />
 
-        <div className="mt-5 mb-2 flex items-center justify-between px-3">
+        <div className="mt-5 mb-2 px-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
             Classes
           </p>
-          <Link
-            to="/student/join"
-            onClick={onNavigate}
-            className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-[var(--color-primary)]"
-            aria-label="Join course"
-            title="Join course"
-          >
-            <UserPlus className="h-4 w-4" />
-          </Link>
         </div>
 
         {courses.loading ? (
@@ -300,7 +292,36 @@ function StudentSidebar({ onNavigate }: { onNavigate?: () => void }) {
           />
         ) : null}
       </div>
-      <SignOutButton onNavigate={onNavigate} />
+
+      <div className="border-t border-[var(--color-border)] p-3">
+        <NavLink
+          to="/student/settings"
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            cn(
+              'mb-0.5 flex w-full items-center gap-3 rounded-[var(--radius-control)] px-3 py-3 text-[15px] font-semibold transition',
+              isActive
+                ? 'bg-[var(--color-sidebar-active)] text-[var(--color-primary)]'
+                : 'text-[var(--color-muted)] hover:bg-slate-50 hover:text-[var(--color-foreground)]',
+            )
+          }
+        >
+          <Settings className="h-5 w-5 shrink-0 opacity-90" />
+          Settings
+        </NavLink>
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 rounded-[var(--radius-control)] px-3 py-3 text-[15px] font-semibold text-[var(--color-muted)] transition hover:bg-slate-50 hover:text-[var(--color-foreground)]"
+          onClick={() => {
+            onNavigate?.()
+            logout()
+            navigate('/login')
+          }}
+        >
+          <LogOut className="h-5 w-5 shrink-0" />
+          Sign out
+        </button>
+      </div>
     </div>
   )
 }

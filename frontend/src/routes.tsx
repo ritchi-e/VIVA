@@ -90,6 +90,7 @@ export function AppRoutes() {
           <Route path="/student/viva/:id" element={<StudentVivaPage />} />
           <Route path="/student/results" element={<StudentResultsListPage />} />
           <Route path="/student/results/:id" element={<StudentResultsPage />} />
+          <Route path="/student/settings" element={<SettingsPage />} />
         </Route>
       </Route>
 

@@ -51,7 +51,7 @@ export function AssignmentCreatePage() {
       allow_pptx: values.allowPptx,
       allow_zip: values.allowZip,
       allow_github: values.allowGithub,
-      viva_config: { question_budget: values.questionBudget },
+      viva_config: { question_budget: values.questionBudget, total_points: values.totalPoints },
     })
 
     const id = created.data.id

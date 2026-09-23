@@ -163,6 +163,8 @@ export const authApi = {
     }>('/auth/register/', payload),
   me: () =>
     api.get<{ user: User; memberships: import('@/types').Membership[] }>('/auth/me/'),
+  updateProfile: (payload: { full_name: string }) =>
+    api.patch<{ user: User; memberships: import('@/types').Membership[] }>('/auth/me/', payload),
   google: (payload: GoogleAuthPayload) =>
     api.post<{
       user: User

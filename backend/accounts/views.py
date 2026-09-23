@@ -16,6 +16,7 @@ from accounts.serializers import (
     MembershipSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    ProfileUpdateSerializer,
     RegisterSerializer,
     UserSerializer,
 )
@@ -93,6 +94,20 @@ class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        memberships = Membership.objects.filter(user=request.user, is_active=True).select_related("organization")
+        return Response(
+            {
+                "user": UserSerializer(request.user).data,
+                "memberships": MembershipSerializer(memberships, many=True).data,
+            }
+        )
+
+    def patch(self, request):
+        serializer = ProfileUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        if "full_name" in serializer.validated_data:
+            request.user.full_name = serializer.validated_data["full_name"].strip()
+            request.user.save(update_fields=["full_name", "updated_at"])
         memberships = Membership.objects.filter(user=request.user, is_active=True).select_related("organization")
         return Response(
             {

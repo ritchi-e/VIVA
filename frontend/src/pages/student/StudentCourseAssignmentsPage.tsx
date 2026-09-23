@@ -93,6 +93,12 @@ export function StudentCourseAssignmentsPage() {
                   </Link>
                   <p className="mt-1 text-sm text-[var(--color-muted)]">
                     Due {formatDate(assignment.due_at)}
+                    {(() => {
+                      const pts = Number(
+                        (assignment.viva_config as { total_points?: number } | undefined)?.total_points,
+                      )
+                      return Number.isFinite(pts) && pts > 0 ? ` · ${pts} points` : ''
+                    })()}
                   </p>
                 </div>
                 <Badge tone={tone}>{badge}</Badge>

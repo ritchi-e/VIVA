@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 import {
   CRITERION_LIBRARY,
   RUBRIC_TEMPLATES,
-  criteriaFromTemplate,
+  defaultBestCriteria,
   toApiCriteria,
   type RubricCriterionDraft,
 } from '@/lib/rubricTemplates'
@@ -35,6 +35,8 @@ export type AssignmentSetupValues = {
   allowZip: boolean
   allowGithub: boolean
   questionBudget: number
+  /** Instructor-set total points (not derived from rubric criteria). */
+  totalPoints: number
   templateId: string | null
   criteria: RubricCriterionDraft[]
 }
@@ -51,8 +53,9 @@ export function defaultSetupValues(overrides?: Partial<AssignmentSetupValues>): 
     allowZip: true,
     allowGithub: true,
     questionBudget: 8,
-    templateId: 'general_project',
-    criteria: criteriaFromTemplate('general_project'),
+    totalPoints: 100,
+    templateId: null,
+    criteria: defaultBestCriteria(),
     ...overrides,
   }
 }
@@ -72,6 +75,7 @@ export function setupChecklist(values: AssignmentSetupValues, { requireCourse = 
     },
     { ok: values.criteria.length > 0, label: 'Rubric' },
     { ok: values.questionBudget >= 1, label: 'Viva' },
+    { ok: values.totalPoints > 0, label: 'Points' },
   ]
 }
 
@@ -83,10 +87,6 @@ export function rubricPayloadFromSetup(values: AssignmentSetupValues) {
     template_id: values.templateId || undefined,
     criteria: toApiCriteria(values.criteria),
   }
-}
-
-export function totalPointsFromCriteria(criteria: RubricCriterionDraft[]) {
-  return criteria.reduce((sum, c) => sum + (Number(c.max_score) || 0), 0)
 }
 
 function FieldLabel({ children }: { children: ReactNode }) {
@@ -177,19 +177,24 @@ export function AssignmentSetupFormFields({
   const [showCustom, setShowCustom] = useState(false)
   const [customName, setCustomName] = useState('')
   const [customDescription, setCustomDescription] = useState('')
+  /**
+   * Pack filter for Available only — switching packs must never rewrite Selected.
+   * "all" shows the full library; a pack id shows that pack's criteria still available.
+   */
+  const [packFilter, setPackFilter] = useState<string>('all')
 
   const selectedKeys = useMemo(() => new Set(values.criteria.map((c) => c.key)), [values.criteria])
-  const availableLibrary = useMemo(
-    () => CRITERION_LIBRARY.filter((item) => !selectedKeys.has(item.key)),
-    [selectedKeys],
-  )
-  const totalPoints = totalPointsFromCriteria(values.criteria)
+  const availableLibrary = useMemo(() => {
+    const pack = RUBRIC_TEMPLATES.find((t) => t.id === packFilter)
+    const allowedKeys = pack ? new Set(pack.criteriaKeys) : null
+    return CRITERION_LIBRARY.filter((item) => {
+      if (selectedKeys.has(item.key)) return false
+      if (!allowedKeys) return true
+      return allowedKeys.has(item.key)
+    })
+  }, [selectedKeys, packFilter])
 
   const set = (patch: Partial<AssignmentSetupValues>) => onChange(patch)
-
-  const applyTemplate = (id: string) => {
-    set({ templateId: id, criteria: criteriaFromTemplate(id) })
-  }
 
   const addCriterion = (item: RubricCriterionDraft) => {
     onChange((prev) => {
@@ -271,12 +276,17 @@ export function AssignmentSetupFormFields({
 
           <div>
             <FieldLabel>Points</FieldLabel>
-            <div className="rounded-[var(--radius-control)] border border-[var(--color-border)] bg-[var(--color-surface)]/50 px-3 py-2.5 text-sm font-semibold text-[var(--color-foreground)]">
-              {totalPoints}
-              <span className="ml-1.5 text-xs font-normal text-[var(--color-muted)]">
-                from {values.criteria.length} criteria
-              </span>
-            </div>
+            <Input
+              type="number"
+              min={1}
+              step={1}
+              value={values.totalPoints}
+              onChange={(e) => {
+                const next = Number(e.target.value)
+                set({ totalPoints: Number.isFinite(next) && next > 0 ? next : 1 })
+              }}
+              aria-label="Total points for this assignment"
+            />
           </div>
 
           <div>
@@ -362,18 +372,25 @@ export function AssignmentSetupFormFields({
               <div>
                 <h2 className="font-display text-base font-bold text-[var(--color-foreground)]">Rubric</h2>
                 <p className="mt-0.5 text-sm text-[var(--color-muted)]">
-                  Pick a pack, then add or remove criteria.
+                  Browse a pack to see suggested criteria. Switching packs only changes Available — your
+                  Selected list stays put.
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Rubric packs">
+                <PackChip
+                  label="All"
+                  title="Show every criterion in the library"
+                  selected={packFilter === 'all'}
+                  onClick={() => setPackFilter('all')}
+                />
                 {RUBRIC_TEMPLATES.map((t) => (
                   <PackChip
                     key={t.id}
                     label={t.label}
                     title={t.description}
-                    selected={values.templateId === t.id}
-                    onClick={() => applyTemplate(t.id)}
+                    selected={packFilter === t.id}
+                    onClick={() => setPackFilter(t.id)}
                   />
                 ))}
               </div>
@@ -387,7 +404,9 @@ export function AssignmentSetupFormFields({
                   <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2">
                     {availableLibrary.length === 0 ? (
                       <li className="px-2 py-6 text-center text-xs text-[var(--color-muted)]">
-                        Everything from the library is selected.
+                        {packFilter === 'all'
+                          ? 'Everything from the library is selected.'
+                          : 'Nothing left in this pack — try All, or check Selected.'}
                       </li>
                     ) : (
                       availableLibrary.map((item) => (
@@ -469,7 +488,7 @@ export function AssignmentSetupFormFields({
                   <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2">
                     {values.criteria.length === 0 ? (
                       <li className="px-2 py-6 text-center text-xs text-[var(--color-muted)]">
-                        Choose a pack, or add from Available.
+                        Add criteria from Available.
                       </li>
                     ) : (
                       values.criteria.map((c) => (

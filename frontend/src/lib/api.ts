@@ -176,7 +176,8 @@ export const authApi = {
 }
 
 export const dashboardApi = {
-  metrics: () => api.get<DashboardMetrics>('/orgs/dashboard/'),
+  metrics: (params?: { course?: string; assignment?: string; since?: string }) =>
+    api.get<DashboardMetrics>('/orgs/dashboard/', { params }),
 }
 
 export const coursesApi = {

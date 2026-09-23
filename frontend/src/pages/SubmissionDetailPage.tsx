@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { assessmentsApi, submissionsApi } from '@/lib/api'
 import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -13,12 +13,22 @@ import { RepositorySummary } from '@/components/submissions/RepositorySummary'
 import { AssignmentMismatchBanner } from '@/components/submissions/AssignmentMismatchBanner'
 import { PlagiarismReportPanel } from '@/components/submissions/PlagiarismReportPanel'
 import { SubmissionWorkViewer } from '@/components/submissions/SubmissionWorkViewer'
+import { EvidencePanel } from '@/components/evidence/EvidencePanel'
 import type { Assessment } from '@/types'
 import { formatSubmissionProcessingError } from '@/lib/userErrors'
+import { Tabs } from '@/components/ui/Tabs'
 import { formatDate } from '@/lib/utils'
 
 export function SubmissionDetailPage() {
   const { id = '' } = useParams()
+  const [params, setParams] = useSearchParams()
+  const tabParam = params.get('tab') as 'assessment' | 'work' | 'evidence' | 'similarity' | null
+  const initialTab =
+    tabParam && ['assessment', 'work', 'evidence', 'similarity'].includes(tabParam)
+      ? tabParam
+      : 'assessment'
+  const [tab, setTab] = useState<'assessment' | 'work' | 'evidence' | 'similarity'>(initialTab)
+
   const submission = useAsync(() => submissionsApi.get(id).then((r) => r.data), [id])
   const assessmentQuery = useAsync(() => assessmentsApi.bySubmission(id), [id])
   const [assessment, setAssessment] = useState<Assessment | null>(null)
@@ -27,85 +37,125 @@ export function SubmissionDetailPage() {
     if (assessmentQuery.data) setAssessment(assessmentQuery.data)
   }, [assessmentQuery.data])
 
+  useEffect(() => {
+    setTab(initialTab)
+  }, [initialTab])
+
+  const selectTab = (next: 'assessment' | 'work' | 'evidence' | 'similarity') => {
+    setTab(next)
+    const nextParams = new URLSearchParams(params)
+    if (next === 'assessment') nextParams.delete('tab')
+    else nextParams.set('tab', next)
+    setParams(nextParams, { replace: true })
+  }
+
+  const studentLabel = useMemo(() => {
+    if (!submission.data) return 'Student'
+    return submission.data.student_name || submission.data.student_email || 'Student'
+  }, [submission.data])
+
   if (submission.loading) return <ProgressPanel copy={PLATFORM_PROGRESS.submissions} />
   if (submission.error || !submission.data) {
     return <ErrorState message={submission.error ?? 'Submission not found'} onRetry={submission.reload} />
   }
 
+  const s = submission.data
   const activeAssessment = assessment ?? assessmentQuery.data
+  const processingError = formatSubmissionProcessingError(s.processing_error)
 
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
-        title="Submission review"
-        description={`${submission.data.assignment_title || 'Submission'} · ${submission.data.student_name || submission.data.student_email || 'Student'} · v${submission.data.version}`}
+        title={studentLabel}
+        description={`${s.assignment_title || 'Assignment'}${s.version > 1 ? ` · v${s.version}` : ''} · ${formatDate(s.created_at)}`}
         actions={
-          <Link to={`/assignments/${submission.data.assignment}`} className="mk-link text-sm">
-            View assignment
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={s.status === 'ready' ? 'success' : s.status === 'failed' ? 'danger' : 'info'}>
+              {s.status}
+            </Badge>
+            {activeAssessment ? (
+              <Badge tone={activeAssessment.status === 'finalized' ? 'success' : 'warning'}>
+                {activeAssessment.status.replace(/_/g, ' ')}
+              </Badge>
+            ) : null}
+            <Link to={`/assignments/${s.assignment}`} className="mk-link text-sm">
+              Assignment
+            </Link>
+          </div>
         }
       />
-      {submission.data.assignment_mismatch ? (
-        <div className="mb-6">
-          <AssignmentMismatchBanner
-            mismatch={submission.data.assignment_mismatch}
-            reason={submission.data.assignment_mismatch_reason}
-          />
+
+      {s.assignment_mismatch ? (
+        <AssignmentMismatchBanner
+          mismatch={s.assignment_mismatch}
+          reason={s.assignment_mismatch_reason}
+        />
+      ) : null}
+
+      {processingError ? (
+        <Card>
+          <CardBody className="text-sm text-[var(--color-danger)]">{processingError}</CardBody>
+        </Card>
+      ) : null}
+
+      <Tabs
+        items={[
+          { id: 'assessment', label: 'Assessment' },
+          { id: 'work', label: 'Submitted work' },
+          { id: 'evidence', label: 'Evidence' },
+          { id: 'similarity', label: 'Similarity' },
+        ]}
+        value={tab}
+        onChange={selectTab}
+      />
+
+      {tab === 'assessment' ? (
+        assessmentQuery.loading ? (
+          <ProgressPanel copy={PLATFORM_PROGRESS.assessment} />
+        ) : activeAssessment ? (
+          <AssessmentReview assessment={activeAssessment} onUpdated={setAssessment} compact />
+        ) : (
+          <Card>
+            <CardBody className="text-sm text-[var(--color-muted)]">
+              No AI assessment yet. It appears after the viva completes. Check{' '}
+              <button type="button" className="mk-link" onClick={() => selectTab('work')}>
+                submitted work
+              </button>{' '}
+              while you wait.
+            </CardBody>
+          </Card>
+        )
+      ) : null}
+
+      {tab === 'work' ? (
+        <div className="space-y-4">
+          <Card>
+            <CardBody>
+              <SubmissionWorkViewer submission={s} compact />
+            </CardBody>
+          </Card>
+          {s.repository ? (
+            <Card>
+              <CardBody>
+                <RepositorySummary submission={s} />
+              </CardBody>
+            </Card>
+          ) : null}
         </div>
       ) : null}
-      <Card className="mb-6">
-        <CardBody className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-          <p>
-            Student:{' '}
-            <Link to={`/students/${submission.data.student}`} className="mk-link">
-              {submission.data.student_name || submission.data.student_email}
-            </Link>
-          </p>
-          <p>Uploaded: {formatDate(submission.data.created_at)}</p>
-          <p>
-            Status: <Badge>{submission.data.status}</Badge>
-          </p>
-          {formatSubmissionProcessingError(submission.data.processing_error) ? (
-            <p className="text-red-600 sm:col-span-2">
-              {formatSubmissionProcessingError(submission.data.processing_error)}
-            </p>
-          ) : null}
-        </CardBody>
-      </Card>
-      <Card className="mb-6">
-        <CardBody>
-          <h2 className="mb-4 text-sm font-semibold text-slate-900">Submitted work</h2>
-          <SubmissionWorkViewer submission={submission.data} />
-        </CardBody>
-      </Card>
-      {submission.data.repository ? (
-        <Card className="mb-6">
-          <CardBody>
-            <RepositorySummary submission={submission.data} />
-          </CardBody>
-        </Card>
-      ) : null}
 
-      {assessmentQuery.loading ? <ProgressPanel copy={PLATFORM_PROGRESS.assessment} /> : null}
+      {tab === 'evidence' ? <EvidencePanel submissionId={id} /> : null}
 
-      {submission.data.plagiarism_report ? (
-        <PlagiarismReportPanel report={submission.data.plagiarism_report} />
-      ) : !assessmentQuery.loading ? (
-        <Card className="mb-6">
-          <CardBody className="text-sm text-slate-600">
-            No similarity report yet. It is generated automatically after the student completes their viva.
-          </CardBody>
-        </Card>
-      ) : null}
-
-      {activeAssessment ? (
-        <AssessmentReview assessment={activeAssessment} onUpdated={setAssessment} />
-      ) : !assessmentQuery.loading ? (
-        <Card>
-          <CardBody className="text-sm text-slate-600">
-            No AI assessment is available for this submission yet. It will appear after the viva session completes.
-          </CardBody>
-        </Card>
+      {tab === 'similarity' ? (
+        s.plagiarism_report ? (
+          <PlagiarismReportPanel report={s.plagiarism_report} />
+        ) : (
+          <Card>
+            <CardBody className="text-sm text-[var(--color-muted)]">
+              No similarity report yet. It is generated after the student completes their viva.
+            </CardBody>
+          </Card>
+        )
       ) : null}
     </div>
   )

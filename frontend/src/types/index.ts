@@ -45,7 +45,6 @@ export interface Assignment {
   id: string
   course: string
   title: string
-  description: string
   instructions: string
   status: 'draft' | 'published' | 'closed'
   due_at: string | null
@@ -241,6 +240,10 @@ export interface VivaAnswerEvaluation {
   overall: number
   requires_follow_up: boolean
   explanation: string
+  confidence?: string
+  evidence_quality?: string
+  version?: number
+  is_current?: boolean
 }
 
 export interface VivaStudentAnswer {
@@ -249,6 +252,9 @@ export interface VivaStudentAnswer {
   input_mode: string
   submitted_at: string
   evaluation?: VivaAnswerEvaluation | null
+  current_evaluation?: VivaAnswerEvaluation | null
+  duration_seconds?: number | null
+  metadata?: Record<string, unknown>
 }
 
 export interface VivaQuestion {
@@ -261,6 +267,10 @@ export interface VivaQuestion {
   excerpt?: VivaExcerpt | null
   asked_at: string
   student_answer?: VivaStudentAnswer | null
+  retrieval_query?: string
+  prompt_version?: string
+  model_name?: string
+  model_provider?: string
 }
 
 export interface AssessmentEvidence {
@@ -268,6 +278,7 @@ export interface AssessmentEvidence {
   source_ref: string
   quote: string
   note: string
+  answer?: string | null
 }
 
 export interface AssessmentCriterion {
@@ -301,6 +312,10 @@ export interface AssessmentQuestionReview {
   depth: number | null
   relevance: number | null
   requires_follow_up: boolean | null
+  confidence?: string | null
+  evidence_quality?: string | null
+  evaluation_version?: number | null
+  is_ai_generated?: boolean | null
 }
 
 export interface Assessment {
@@ -324,6 +339,116 @@ export interface Assessment {
   assignment_title?: string
   reviewed_at: string | null
   finalized_at: string | null
+}
+
+export interface EvidenceFlag {
+  id: string
+  viva_session: string
+  viva_question?: string | null
+  answer?: string | null
+  flag_type: string
+  severity: string
+  description: string
+  supporting_evidence: unknown[]
+  confidence: string
+  status: string
+  resolution_note?: string
+  created_at?: string
+}
+
+export interface EvidenceDashboardQuestion {
+  question_id: string
+  sequence: number
+  question_text: string
+  topic: string
+  answered: boolean
+  evaluation_overall: number | null
+  confidence: string
+  source_ref: string
+  flag_count: number
+}
+
+export interface EvidenceDashboard {
+  student: { id: string; name: string; email: string }
+  assignment: { id: string; title: string }
+  submission: { id: string; status: string; version: number }
+  viva_session: {
+    id: string
+    state: string
+    questions_asked: number
+    question_budget: number
+  } | null
+  assessment: {
+    id: string
+    status: string
+    overall_score: number | null
+    ai_overall_score: number | null
+    evidence_summary: string
+  } | null
+  questions: EvidenceDashboardQuestion[]
+  flags: { total: number; open: number }
+  evidence_strength: string
+  topics_assessed: string[]
+  instructor_review_status: string
+}
+
+export interface EvidenceQuestionDetail {
+  question_id: string
+  sequence: number
+  question_text: string
+  question_type: string
+  purpose: string
+  topic: string
+  why_asked: {
+    rationale: string
+    retrieval_query: string
+    source_ref: string
+    excerpt: string
+    source_location: Record<string, unknown>
+  }
+  student_answer: {
+    id: string
+    text: string
+    input_mode: string
+    submitted_at: string
+    duration_seconds?: number | null
+    metadata?: Record<string, unknown>
+  } | null
+  evaluation: VivaAnswerEvaluation | null
+  supporting_evidence: Array<{
+    chunk_id: string
+    quote: string
+    location: Record<string, unknown>
+  }>
+  assessment_evidence: AssessmentEvidence[]
+  flags: Array<{
+    id: string
+    flag_type: string
+    severity: string
+    description: string
+    status: string
+    confidence: string
+  }>
+  follow_ups: Array<{
+    id: string
+    order: number
+    wording: string
+    concept: string
+    is_follow_up: boolean
+  }>
+  ai_provenance: {
+    model_name: string
+    model_provider: string
+    prompt_version: string
+  }
+  provenance_completeness: 'full' | 'limited'
+}
+
+export interface CoverageRow {
+  dimension: string
+  category: string
+  coverage: string
+  question_ids: string[]
 }
 
 export interface StudentSummary {

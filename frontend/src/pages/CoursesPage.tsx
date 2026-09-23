@@ -79,7 +79,13 @@ export function CoursesPage() {
       {loading ? <ProgressPanel copy={PLATFORM_PROGRESS.courses} /> : null}
       {error ? <ErrorState message={error} onRetry={reload} /> : null}
       {!loading && !error && data?.length === 0 ? (
-        <EmptyState title="No courses yet" description="Create a course to start publishing assignments." />
+        <EmptyState
+          title="No courses yet"
+          description="Create a course to start publishing assignments."
+          action={
+            <Button onClick={() => setShowForm(true)}>Create course</Button>
+          }
+        />
       ) : null}
       <div className="grid gap-2">
         {data?.map((course) => (

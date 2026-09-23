@@ -8,8 +8,12 @@ from submissions.adapters.base import BaseSubmissionAdapter, ExtractedDocument
 from submissions.text_sanitize import sanitize_json, sanitize_text
 
 
+EXTRACTOR_VERSION = "pptx-v1"
+
+
 class PptxAdapter(BaseSubmissionAdapter):
     file_type = "pptx"
+    extractor_version = EXTRACTOR_VERSION
 
     def extract(self, data: bytes, filename: str) -> ExtractedDocument:
         prs = Presentation(BytesIO(data))

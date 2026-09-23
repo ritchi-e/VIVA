@@ -7,12 +7,14 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { CoursesPage } from '@/pages/CoursesPage'
 import { CourseDetailPage } from '@/pages/CourseDetailPage'
 import { AssignmentsPage } from '@/pages/AssignmentsPage'
+import { AssignmentCreatePage } from '@/pages/AssignmentCreatePage'
 import { AssignmentDetailPage } from '@/pages/AssignmentDetailPage'
 import { AssignmentBookedSlotsPage } from '@/pages/AssignmentBookedSlotsPage'
 import { AssignmentRubricPage } from '@/pages/AssignmentRubricPage'
 import { AssignmentSettingsPage } from '@/pages/AssignmentSettingsPage'
 import { SubmissionsPage } from '@/pages/SubmissionsPage'
 import { SubmissionDetailPage } from '@/pages/SubmissionDetailPage'
+import { EvidenceDashboardPage } from '@/pages/EvidenceDashboardPage'
 import { VivaSessionsPage } from '@/pages/VivaSessionsPage'
 import { VivaSessionDetailPage } from '@/pages/VivaSessionDetailPage'
 import { StudentsPage } from '@/pages/StudentsPage'
@@ -42,12 +44,14 @@ export function AppRoutes() {
           <Route path="/courses" element={<CoursesPage />} />
           <Route path="/courses/:id" element={<CourseDetailPage />} />
           <Route path="/assignments" element={<AssignmentsPage />} />
+          <Route path="/assignments/new" element={<AssignmentCreatePage />} />
           <Route path="/assignments/:id" element={<AssignmentDetailPage />} />
           <Route path="/assignments/:id/booked-slots" element={<AssignmentBookedSlotsPage />} />
           <Route path="/assignments/:id/rubric" element={<AssignmentRubricPage />} />
           <Route path="/assignments/:id/settings" element={<AssignmentSettingsPage />} />
           <Route path="/submissions" element={<SubmissionsPage />} />
           <Route path="/submissions/:id" element={<SubmissionDetailPage />} />
+          <Route path="/submissions/:id/evidence" element={<EvidenceDashboardPage />} />
           <Route path="/viva-sessions" element={<VivaSessionsPage />} />
           <Route path="/viva-sessions/:id" element={<VivaSessionDetailPage />} />
           <Route path="/students" element={<StudentsPage />} />

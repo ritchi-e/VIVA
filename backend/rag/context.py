@@ -28,6 +28,7 @@ def retrieve_for_submission(
     query: str,
     *,
     top_k: int = 8,
+    viva_question=None,
 ) -> list[dict[str, Any]]:
     """Embed *query* and retrieve the most relevant submission chunks."""
     total = SubmissionChunk.objects.filter(submission=submission).count()
@@ -41,7 +42,7 @@ def retrieve_for_submission(
     if not embedded:
         return _fallback_chunks(submission, top_k)
 
-    ai = AIService(organization=organization, user=submission.student)
+    ai = AIService(organization=organization, user=submission.student, submission=submission)
     vector = ai.embed([query]).vectors[0]
     return retrieve_similar_chunks(
         submission.id,
@@ -49,6 +50,7 @@ def retrieve_for_submission(
         organization_id=organization.id,
         top_k=top_k,
         query_text=query,
+        viva_question_id=getattr(viva_question, "id", None) or viva_question,
     )
 
 

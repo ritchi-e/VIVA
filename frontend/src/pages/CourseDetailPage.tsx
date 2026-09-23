@@ -3,9 +3,11 @@ import { coursesApi, assignmentsApi } from '@/lib/api'
 import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
 import { ProgressPanel } from '@/components/ui/Spinner'
 import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
-import { ErrorState } from '@/components/layout/StateViews'
+import { EmptyState, ErrorState } from '@/components/layout/StateViews'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 
 export function CourseDetailPage() {
   const { id = '' } = useParams()
@@ -13,29 +15,43 @@ export function CourseDetailPage() {
   const assignments = useAsync(() => assignmentsApi.list({ course: id }), [id])
 
   if (course.loading) return <ProgressPanel copy={PLATFORM_PROGRESS.courses} />
-  if (course.error || !course.data) return <ErrorState message={course.error ?? 'Course not found'} onRetry={course.reload} />
+  if (course.error || !course.data) {
+    return <ErrorState message={course.error ?? 'Course not found'} onRetry={course.reload} />
+  }
 
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
         title={`${course.data.code} — ${course.data.title}`}
         description={course.data.description || 'Course details'}
+        actions={
+          <Link to={`/assignments/new?course=${id}`}>
+            <Button>Create assignment</Button>
+          </Link>
+        }
       />
-      <Card className="mb-6">
-        <CardBody>
-          <p className="text-sm text-slate-600">{course.data.description || 'No description provided.'}</p>
-        </CardBody>
-      </Card>
-      <h2 className="mb-3 text-lg font-semibold text-slate-900">Assignments</h2>
+      <h2 className="font-display text-lg font-semibold">Assignments</h2>
       {assignments.loading ? <ProgressPanel copy={PLATFORM_PROGRESS.assignments} /> : null}
       {assignments.error ? <ErrorState message={assignments.error} onRetry={assignments.reload} /> : null}
-      <div className="space-y-3">
+      {!assignments.loading && (assignments.data?.length ?? 0) === 0 ? (
+        <EmptyState
+          title="No assignments yet"
+          description="Create an assignment for this course, then publish it when ready."
+          action={
+            <Link to={`/assignments/new?course=${id}`}>
+              <Button>Create assignment</Button>
+            </Link>
+          }
+        />
+      ) : null}
+      <div className="space-y-2">
         {assignments.data?.map((a) => (
-          <Card key={a.id}>
-            <CardBody>
-              <Link to={`/assignments/${a.id}`} className="mk-link">
+          <Card key={a.id} hover>
+            <CardBody className="flex items-center justify-between gap-3 py-4">
+              <Link to={`/assignments/${a.id}`} className="text-base font-semibold hover:text-[var(--color-primary)]">
                 {a.title}
               </Link>
+              <StatusBadge kind="assignment" value={a.status} />
             </CardBody>
           </Card>
         ))}

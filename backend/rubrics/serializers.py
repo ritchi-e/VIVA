@@ -41,3 +41,19 @@ class RubricCriterionCreateSerializer(serializers.ModelSerializer):
             "order",
             "category",
         )
+
+
+class RubricCriterionReplaceItemSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=128)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    weight = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default=1)
+    max_score = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=10)
+    order = serializers.IntegerField(required=False, min_value=0, default=0)
+    category = serializers.CharField(required=False, allow_blank=True, max_length=64, default="")
+
+
+class RubricReplaceCriteriaSerializer(serializers.Serializer):
+    title = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    description = serializers.CharField(required=False, allow_blank=True)
+    template_id = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    criteria = RubricCriterionReplaceItemSerializer(many=True)

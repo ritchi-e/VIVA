@@ -7,10 +7,12 @@ from submissions.adapters.base import BaseSubmissionAdapter, ExtractedDocument
 from submissions.text_sanitize import sanitize_json, sanitize_text
 
 TEXT_EXTENSIONS = {".md", ".txt", ".py", ".java", ".c", ".cpp", ".h", ".js", ".ts", ".json", ".yaml", ".yml", ".rst"}
+EXTRACTOR_VERSION = "zip-v1"
 
 
 class ZipAdapter(BaseSubmissionAdapter):
     file_type = "zip"
+    extractor_version = EXTRACTOR_VERSION
 
     def extract(self, data: bytes, filename: str) -> ExtractedDocument:
         texts = []

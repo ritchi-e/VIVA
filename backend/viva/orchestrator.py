@@ -262,12 +262,34 @@ class VivaOrchestrator:
         sequence = self.session.questions_asked + 1
         rag_chunks = turn.get("rag_chunks") or (planned.metadata.get("rag_chunks") if planned else []) or []
         excerpt = turn.get("excerpt") or {}
+        source_chunk = None
+        source_chunk_id = (
+            excerpt.get("chunk_id")
+            or (planned.metadata.get("source_chunk_id") if planned else None)
+            or (rag_chunks[0].get("chunk_id") if rag_chunks else None)
+        )
+        if source_chunk_id:
+            from django.core.exceptions import ValidationError
+            from submissions.models import SubmissionChunk
+
+            try:
+                source_chunk = SubmissionChunk.objects.filter(
+                    submission_id=self.session.submission_id,
+                    id=source_chunk_id,
+                ).first()
+            except (ValidationError, ValueError):
+                source_chunk = None
         vq = VivaQuestion.objects.create(
             session=self.session,
             planned_question=planned,
             sequence=sequence,
             question_text=turn.get("question_text") or (planned.wording if planned else ""),
             question_type=(planned.question_type if planned else PlannedQuestion.QuestionType.CONCEPTUAL),
+            retrieval_query=(planned.retrieval_query if planned else "") or turn.get("retrieval_query") or "",
+            prompt_version=(planned.prompt_version if planned else "") or "viva_turn.v1",
+            model_name=(planned.model_name if planned else "") or turn.get("model_name") or "",
+            model_provider=(planned.model_provider if planned else "") or turn.get("model_provider") or "",
+            source_chunk=source_chunk,
             provenance={
                 "planned_question_id": str(planned.id) if planned else None,
                 "mode": mode,
@@ -382,7 +404,16 @@ class VivaOrchestrator:
             in (VivaSession.State.COMPLETED, VivaSession.State.REVIEW_REQUIRED),
         }
 
-    def submit_answer(self, question_id, text: str, *, input_mode: str = "text") -> dict[str, Any]:
+    def submit_answer(
+        self,
+        question_id,
+        text: str,
+        *,
+        input_mode: str = "text",
+        audio_storage_key: str = "",
+        metadata: dict | None = None,
+        duration_seconds: float | None = None,
+    ) -> dict[str, Any]:
         self._refresh()
 
         # Auto-recover if the session was prepared but never started.
@@ -413,7 +444,14 @@ class VivaOrchestrator:
         attempt = vq.attempts.order_by("-attempt_number").first()
         if not attempt:
             attempt = QuestionAttempt.objects.create(question=vq, attempt_number=1)
-        answer = StudentAnswer.objects.create(attempt=attempt, text=text, input_mode=input_mode)
+        answer = StudentAnswer.objects.create(
+            attempt=attempt,
+            text=text,
+            input_mode=input_mode,
+            audio_storage_key=audio_storage_key or "",
+            metadata=metadata or {},
+            duration_seconds=duration_seconds,
+        )
         attempt.completed_at = timezone.now()
         attempt.save(update_fields=["completed_at", "updated_at"])
 

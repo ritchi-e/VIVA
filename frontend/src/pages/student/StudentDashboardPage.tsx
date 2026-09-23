@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   assignmentsApi,
@@ -13,12 +13,16 @@ import { formatVivaErrorMessage } from '@/lib/userErrors'
 import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { ProgressPanel } from '@/components/ui/Spinner'
 import { PreparingVivaOverlay } from '@/components/viva/PreparingVivaOverlay'
+import { StudentAssessmentCard } from '@/components/student/StudentAssessmentCard'
+import { Alert } from '@/components/ui/Alert'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { EmptyState } from '@/components/layout/StateViews'
 import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { formatDate, formatScore } from '@/lib/utils'
+import type { Submission } from '@/types'
 
 function slotTimeLabel(iso: string) {
   const d = new Date(iso)
@@ -48,7 +52,7 @@ export function StudentDashboardPage() {
       const response = await vivaApi.start({
         assignment: b.assignment,
         submission: b.submission,
-        mode: 'text',
+        mode: 'voice',
       })
       const sessionId = response.data?.id ? String(response.data.id) : ''
       if (!sessionId || sessionId === 'undefined') {
@@ -67,269 +71,234 @@ export function StudentDashboardPage() {
     }
   }
 
-  const published = (assignments.data || []).filter((a) => a.status === 'published')
-  const recentSessions = (sessions.data || []).slice(0, 5)
-  const recentSubs = (submissions.data || []).slice(0, 5)
+  const published = useMemo(
+    () => (assignments.data || []).filter((a) => a.status === 'published'),
+    [assignments.data],
+  )
+  const subsByAssignment = useMemo(() => {
+    const map = new Map<string, Submission>()
+    for (const s of submissions.data || []) {
+      const prev = map.get(s.assignment)
+      if (!prev || (s.version ?? 0) > (prev.version ?? 0)) map.set(s.assignment, s)
+    }
+    return map
+  }, [submissions.data])
+
+  const actionCards = useMemo(() => {
+    return published.map((a) => {
+      const sub = subsByAssignment.get(a.id)
+      const booking = (bookings.data || []).find(
+        (b) => b.assignment === a.id && (b.status === 'booked' || b.status === 'started'),
+      )
+      const session = (sessions.data || []).find((s) => s.assignment === a.id)
+      const done = session && ['COMPLETED', 'REVIEW_REQUIRED'].includes(session.state)
+
+      if (done && session) {
+        return {
+          key: a.id,
+          title: a.title,
+          dueAt: a.due_at,
+          statusLabel: 'Viva completed',
+          statusKind: 'viva' as const,
+          statusValue: session.state,
+          primaryLabel: 'View results',
+          primaryTo: `/student/results/${session.id}`,
+          secondaryLabel: 'Assignment',
+          secondaryTo: `/student/assignments/${a.id}`,
+        }
+      }
+
+      if (booking) {
+        const startsAt = new Date(booking.slot_start)
+        const endsAt = new Date(booking.slot_end)
+        const now = new Date()
+        const expired = now > endsAt
+        const canJoin = !expired && (booking.status === 'started' || startsAt <= now)
+        const sessionState = booking.viva_session_state || null
+        const sessionFailed = sessionState === 'FAILED'
+        const joinableSession =
+          Boolean(booking.viva_session_id) &&
+          !sessionFailed &&
+          (!sessionState ||
+            ['READY', 'IN_PROGRESS', 'PREPARING', 'CREATED'].includes(sessionState))
+
+        if (expired) {
+          return {
+            key: a.id,
+            title: a.title,
+            dueAt: a.due_at,
+            statusLabel: 'Slot expired — book another time',
+            statusKind: 'booking' as const,
+            statusValue: 'no_show',
+            primaryLabel: 'Book viva slot',
+            primaryTo: `/student/assignments/${a.id}/book-slot`,
+          }
+        }
+        if (canJoin && joinableSession && booking.viva_session_id) {
+          return {
+            key: a.id,
+            title: a.title,
+            dueAt: a.due_at,
+            statusLabel: `Slot open · ${slotTimeLabel(booking.slot_start)}`,
+            statusKind: 'booking' as const,
+            statusValue: booking.status,
+            primaryLabel: sessionFailed ? 'Retry viva prep' : 'Join viva',
+            primaryTo: `/student/viva/${booking.viva_session_id}`,
+          }
+        }
+        if (canJoin) {
+          return {
+            key: a.id,
+            title: a.title,
+            dueAt: a.due_at,
+            statusLabel: `Slot open · ${slotTimeLabel(booking.slot_start)}`,
+            statusKind: 'booking' as const,
+            statusValue: booking.status,
+            primaryLabel: 'Start viva',
+            onPrimary: () => void startVivaFromBooking(booking),
+            primaryLoading: startingViva,
+          }
+        }
+        return {
+          key: a.id,
+          title: a.title,
+          dueAt: a.due_at,
+          statusLabel: `Booked for ${slotTimeLabel(booking.slot_start)}`,
+          statusKind: 'booking' as const,
+          statusValue: booking.status,
+          primaryLabel: 'View booking',
+          primaryTo: `/student/assignments/${a.id}/book-slot`,
+        }
+      }
+
+      if (sub?.status === 'ready') {
+        return {
+          key: a.id,
+          title: a.title,
+          dueAt: a.due_at,
+          statusLabel: 'Submission ready — book your viva',
+          statusKind: 'submission' as const,
+          statusValue: sub.status,
+          primaryLabel: 'Book viva slot',
+          primaryTo: `/student/assignments/${a.id}/book-slot`,
+          secondaryLabel: 'View submission',
+          secondaryTo: `/student/submissions/${sub.id}`,
+        }
+      }
+
+      if (sub && ['uploaded', 'queued', 'processing'].includes(sub.status)) {
+        return {
+          key: a.id,
+          title: a.title,
+          dueAt: a.due_at,
+          statusLabel: 'Preparing your submission for the viva',
+          statusKind: 'submission' as const,
+          statusValue: sub.status,
+          primaryLabel: 'Check status',
+          primaryTo: `/student/assignments/${a.id}`,
+        }
+      }
+
+      if (sub?.status === 'failed') {
+        return {
+          key: a.id,
+          title: a.title,
+          dueAt: a.due_at,
+          statusLabel: 'Submission needs a fix — reopen the assignment',
+          statusKind: 'submission' as const,
+          statusValue: sub.status,
+          primaryLabel: 'Fix submission',
+          primaryTo: `/student/assignments/${a.id}`,
+        }
+      }
+
+      return {
+        key: a.id,
+        title: a.title,
+        dueAt: a.due_at,
+        statusLabel: 'Not started — submit your work first',
+        statusKind: 'assignment' as const,
+        statusValue: a.status,
+        primaryLabel: 'Open assessment',
+        primaryTo: `/student/assignments/${a.id}`,
+      }
+    })
+  }, [published, subsByAssignment, bookings.data, sessions.data, startingViva])
+
   const completedAssessments = (assessments.data || []).filter(
     (a) => a.overall_score != null || a.ai_overall_score != null,
   )
-  const scoreValues = completedAssessments
-    .map((a) => a.overall_score ?? a.ai_overall_score)
-    .filter((n): n is number => n != null)
-  const averageScore = scoreValues.length
-    ? scoreValues.reduce((sum, n) => sum + n, 0) / scoreValues.length
-    : null
-  const completedVivas = (sessions.data || []).filter((s) =>
-    ['COMPLETED', 'REVIEW_REQUIRED'].includes(s.state),
-  ).length
+
+  const loading = assignments.loading || submissions.loading || sessions.loading || bookings.loading
 
   return (
-    <div>
+    <div className="space-y-5">
       {startingViva && <PreparingVivaOverlay />}
       <PageHeader
-        title="Student dashboard"
-        description="Your assignments, submissions, and viva progress."
+        title="Your assessments"
+        description="Do the next step for each viva. Estimated viva time is usually 10–15 minutes."
       />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card hover>
-          <CardBody>
-            <p className="text-sm font-medium text-[var(--color-muted)]">Open assignments</p>
-            <p className="mk-kpi mt-2">{published.length}</p>
-          </CardBody>
-        </Card>
-        <Card hover>
-          <CardBody>
-            <p className="text-sm font-medium text-[var(--color-muted)]">Submissions</p>
-            <p className="mk-kpi mt-2">{submissions.data?.length ?? '—'}</p>
-          </CardBody>
-        </Card>
-        <Card hover>
-          <CardBody>
-            <p className="text-sm font-medium text-[var(--color-muted)]">Vivas completed</p>
-            <p className="mk-kpi mt-2">{sessions.data ? completedVivas : '—'}</p>
-          </CardBody>
-        </Card>
-        <Card hover>
-          <CardBody>
-            <p className="text-sm font-medium text-[var(--color-muted)]">Average score</p>
-            <p className="mk-kpi mt-2">
-              {averageScore == null ? '—' : formatScore(averageScore)}
-            </p>
-          </CardBody>
-        </Card>
-      </div>
 
-      {vivaError && (
-        <div className="mt-4 rounded-[var(--radius-control)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+      {vivaError ? (
+        <Alert tone="danger" title="Could not start viva">
           {vivaError}
-        </div>
-      )}
+        </Alert>
+      ) : null}
 
-      {(assignments.loading || submissions.loading || sessions.loading) && (
-        <div className="mt-5">
-          <ProgressPanel copy={PLATFORM_PROGRESS.dashboard} />
-        </div>
-      )}
+      {loading ? <ProgressPanel copy={PLATFORM_PROGRESS.dashboard} /> : null}
 
-      {(bookings.data ?? []).filter((b) => b.status === 'booked' || b.status === 'started').length >
-        0 && (
-        <Card className="mt-5">
-          <CardBody>
-            <h2 className="mb-4 font-display text-lg font-semibold text-[var(--color-foreground)]">
-              Upcoming booked slots
-            </h2>
-            <ul className="space-y-2">
-              {bookings.data!
-                .filter((b) => b.status === 'booked' || b.status === 'started')
-                .map((b) => {
-                  const startsAt = new Date(b.slot_start)
-                  const endsAt = new Date(b.slot_end)
-                  const now = new Date()
-                  const expired = now > endsAt
-                  const canJoin = !expired && (b.status === 'started' || startsAt <= now)
-                  const sessionState = b.viva_session_state || null
-                  const sessionFailed = sessionState === 'FAILED'
-                  const sessionDone =
-                    sessionState === 'COMPLETED' || sessionState === 'REVIEW_REQUIRED'
-                  const joinableSession =
-                    Boolean(b.viva_session_id) &&
-                    !sessionFailed &&
-                    !sessionDone &&
-                    (!sessionState ||
-                      ['READY', 'IN_PROGRESS', 'PREPARING', 'CREATED'].includes(sessionState))
-                  return (
-                    <li
-                      key={b.id}
-                      className={`flex flex-col gap-3 rounded-[var(--radius-control)] border px-4 py-4 sm:flex-row sm:items-center sm:justify-between ${
-                        expired
-                          ? 'border-red-100 bg-red-50/50'
-                          : 'border-[var(--color-border)] bg-[var(--color-sidebar-active)]/40'
-                      }`}
-                    >
-                      <div>
-                        <p className="text-base font-semibold text-[var(--color-foreground)]">
-                          {b.assignment_title}
-                        </p>
-                        <p className="mt-0.5 text-sm text-[var(--color-muted)]">
-                          {slotTimeLabel(b.slot_start)} — {slotTimeLabel(b.slot_end)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {expired ? (
-                          <span className="text-sm font-medium text-red-600">Slot expired</span>
-                        ) : sessionDone ? (
-                          <span className="text-sm font-medium text-emerald-700">Completed</span>
-                        ) : sessionFailed && canJoin && b.viva_session_id ? (
-                          <Button
-                            className="px-3 py-2 text-sm"
-                            onClick={() => navigate(`/student/viva/${b.viva_session_id}`)}
-                          >
-                            Retry viva prep
-                          </Button>
-                        ) : canJoin && joinableSession ? (
-                          <Button
-                            className="px-3 py-2 text-sm"
-                            onClick={() => navigate(`/student/viva/${b.viva_session_id}`)}
-                          >
-                            Join viva
-                          </Button>
-                        ) : canJoin ? (
-                          <Button
-                            className="px-3 py-2 text-sm"
-                            loading={startingViva}
-                            onClick={() => startVivaFromBooking(b)}
-                          >
-                            Start viva
-                          </Button>
-                        ) : (
-                          <span className="text-sm text-[var(--color-muted)]">
-                            Starts{' '}
-                            {startsAt.toLocaleTimeString(undefined, {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                        )}
-                      </div>
-                    </li>
-                  )
-                })}
-            </ul>
-          </CardBody>
-        </Card>
-      )}
+      {!loading && actionCards.length === 0 ? (
+        <EmptyState
+          title="No assessments yet"
+          description="When your instructor publishes an assignment, it will appear here."
+          action={
+            <Link to="/student/assignments">
+              <Button variant="secondary">Browse assignments</Button>
+            </Link>
+          }
+        />
+      ) : null}
 
-      <div className="mt-5 grid gap-3 lg:grid-cols-2">
-        <Card>
-          <CardBody>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-lg font-semibold text-[var(--color-foreground)]">
-                Recent viva sessions
-              </h2>
-              <Link to="/student/assignments" className="mk-link text-sm">
-                Assignments
-              </Link>
-            </div>
-            {recentSessions.length === 0 ? (
-              <p className="text-base text-[var(--color-muted)]">
-                No viva sessions yet. Book a slot after your submission is ready.
-              </p>
-            ) : (
-              <ul className="space-y-3">
-                {recentSessions.map((s) => {
-                  const done = ['COMPLETED', 'REVIEW_REQUIRED'].includes(s.state)
-                  const href = done
-                    ? `/student/results/${s.id}`
-                    : `/student/assignments/${s.assignment}`
-                  return (
-                    <li
-                      key={s.id}
-                      className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] py-3 last:border-0 last:pb-0"
-                    >
-                      <div>
-                        <Link
-                          to={href}
-                          className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]"
-                        >
-                          {s.assignment_title || 'Viva session'}
-                        </Link>
-                        <p className="mt-0.5 text-sm text-[var(--color-muted)]">
-                          {s.questions_asked}/{s.question_budget} ·{' '}
-                          {formatDate(s.started_at ?? s.created_at)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge tone={s.state === 'COMPLETED' ? 'success' : 'info'}>{s.state}</Badge>
-                        {done ? (
-                          <Link to={`/student/results/${s.id}`} className="mk-link text-sm">
-                            Analysis
-                          </Link>
-                        ) : null}
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardBody>
-            <h2 className="mb-4 font-display text-lg font-semibold text-[var(--color-foreground)]">
-              Recent submissions
-            </h2>
-            {recentSubs.length === 0 ? (
-              <p className="text-base text-[var(--color-muted)]">No submissions yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {recentSubs.map((s) => (
-                  <li
-                    key={s.id}
-                    className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] py-3 last:border-0 last:pb-0"
-                  >
-                    <Link
-                      to={`/student/submissions/${s.id}`}
-                      className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]"
-                    >
-                      {s.assignment_title || 'Submission'}
-                    </Link>
-                    <Badge
-                      tone={
-                        s.status === 'ready' ? 'success' : s.status === 'failed' ? 'danger' : 'default'
-                      }
-                    >
-                      {s.status}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
+      <div className="space-y-3">
+        {actionCards.map((card) => (
+          <StudentAssessmentCard
+            key={card.key}
+            title={card.title}
+            dueAt={card.dueAt}
+            statusLabel={card.statusLabel}
+            statusKind={card.statusKind}
+            statusValue={card.statusValue}
+            primaryLabel={card.primaryLabel}
+            primaryTo={card.primaryTo}
+            onPrimary={card.onPrimary}
+            primaryLoading={card.primaryLoading}
+            secondaryLabel={card.secondaryLabel}
+            secondaryTo={card.secondaryTo}
+          />
+        ))}
       </div>
 
       {completedAssessments.length > 0 ? (
-        <Card className="mt-5">
+        <Card>
           <CardBody>
-            <h2 className="mb-4 font-display text-lg font-semibold text-[var(--color-foreground)]">
-              Your performance
-            </h2>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h2 className="font-display text-lg font-semibold">Recent results</h2>
+              <Link to="/student/results" className="mk-link text-sm">
+                All results
+              </Link>
+            </div>
             <ul className="space-y-3">
-              {completedAssessments.slice(0, 6).map((a) => (
-                <li
-                  key={a.id}
-                  className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] py-3 last:border-0 last:pb-0"
-                >
+              {completedAssessments.slice(0, 4).map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] py-2 last:border-0">
                   <div>
                     <Link
                       to={`/student/results/${a.viva_session}`}
-                      className="text-base font-semibold text-[var(--color-foreground)] hover:text-[var(--color-primary)]"
+                      className="text-base font-semibold hover:text-[var(--color-primary)]"
                     >
-                      {a.assignment_title || 'Viva analysis'}
+                      {a.assignment_title || 'Result'}
                     </Link>
-                    <p className="mt-0.5 text-sm text-[var(--color-muted)]">
-                      {a.status.replace(/_/g, ' ')}
+                    <p className="text-sm text-[var(--color-muted)]">
+                      <StatusBadge kind="assessment" value={a.status} />
                     </p>
                   </div>
                   <span className="font-display text-xl font-semibold tabular-nums text-[var(--color-primary)]">
@@ -341,6 +310,13 @@ export function StudentDashboardPage() {
           </CardBody>
         </Card>
       ) : null}
+
+      <p className="text-xs text-[var(--color-muted)]">
+        Tip: after you submit, wait until the status is “Ready for viva”, then book a slot.
+        {submissions.data?.[0]?.created_at
+          ? ` Latest upload ${formatDate(submissions.data[0].created_at)}.`
+          : ''}
+      </p>
     </div>
   )
 }

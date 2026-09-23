@@ -69,6 +69,17 @@ class VivaQuestion(UUIDModel, SoftDeleteModel):
     question_text = models.TextField()
     question_type = models.CharField(max_length=32, blank=True)
     provenance = models.JSONField(default=dict, blank=True)
+    retrieval_query = models.TextField(blank=True)
+    prompt_version = models.CharField(max_length=64, blank=True)
+    model_name = models.CharField(max_length=128, blank=True)
+    model_provider = models.CharField(max_length=64, blank=True)
+    source_chunk = models.ForeignKey(
+        "submissions.SubmissionChunk",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
     asked_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -88,11 +99,29 @@ class StudentAnswer(UUIDModel, SoftDeleteModel):
     text = models.TextField()
     input_mode = models.CharField(max_length=16, default="text")
     audio_storage_key = models.CharField(max_length=1024, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    duration_seconds = models.FloatField(null=True, blank=True)
     submitted_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def current_evaluation(self):
+        return self.evaluations.filter(is_current=True).order_by("-version").first()
 
 
 class AnswerEvaluation(UUIDModel, SoftDeleteModel):
-    answer = models.OneToOneField(StudentAnswer, on_delete=models.CASCADE, related_name="evaluation")
+    class Confidence(models.TextChoices):
+        HIGH = "high", "High confidence"
+        MEDIUM = "medium", "Medium confidence"
+        LOW = "low", "Low confidence"
+        INSUFFICIENT_EVIDENCE = "insufficient_evidence", "Insufficient evidence"
+
+    class EvidenceQuality(models.TextChoices):
+        DIRECT = "direct", "Direct submission evidence"
+        DERIVED = "derived", "Derived/inferred"
+        STATED = "stated", "Student-stated"
+        EXTERNAL = "external", "External/general knowledge"
+
+    answer = models.ForeignKey(StudentAnswer, on_delete=models.CASCADE, related_name="evaluations")
     conceptual_accuracy = models.FloatField(default=0)
     evidence_support = models.FloatField(default=0)
     depth = models.FloatField(default=0)
@@ -103,6 +132,21 @@ class AnswerEvaluation(UUIDModel, SoftDeleteModel):
     evidence_refs = models.JSONField(default=list, blank=True)
     raw = models.JSONField(default=dict, blank=True)
     is_ai_generated = models.BooleanField(default=True)
+    confidence = models.CharField(max_length=32, choices=Confidence.choices, blank=True)
+    evidence_quality = models.CharField(max_length=32, choices=EvidenceQuality.choices, blank=True)
+    version = models.PositiveIntegerField(default=1)
+    is_current = models.BooleanField(default=True)
+    superseded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-version"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["answer"],
+                condition=models.Q(is_current=True, is_deleted=False),
+                name="uniq_current_eval_per_answer",
+            ),
+        ]
 
 
 class VivaIntegrityEvent(UUIDModel, SoftDeleteModel):

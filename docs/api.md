@@ -26,6 +26,22 @@ Routes are registered in `backend/config/urls.py`. Implementations land in phase
 | `/assessments/` | assessments | 8 |
 | `/ai/` | ai | 4+ |
 | `/audit/` | audit | 10 |
+| `/evidence/` | evidence | Evidence Phase 1 |
+
+## Evidence & provenance (Phase 1)
+
+Instructor-only endpoints (require `X-Organization-ID` + instructor/admin role). Cross-tenant IDs return 404.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/evidence/submissions/{id}/dashboard/` | Evidence dashboard summary for a submission |
+| GET | `/evidence/submissions/{id}/coverage/` | Rubric/topic coverage rows |
+| GET | `/evidence/questions/{id}/detail/` | Question drill-down with provenance + supporting evidence |
+| POST | `/evidence/flags/` | Manually create an `EvidenceFlag` |
+| POST | `/evidence/flags/{id}/resolve/` | Confirm / dismiss / resolve a flag |
+| POST | `/assessments/{id}/question-review/` | Per-question instructor agree/override/insufficient-evidence action |
+
+Frontend: `/submissions/:id/evidence` (Evidence Dashboard) linked from submission review.
 
 ## Conventions
 

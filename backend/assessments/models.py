@@ -86,6 +86,15 @@ class AssessmentEvidence(UUIDModel, SoftDeleteModel):
 
 
 class AssessmentModification(UUIDModel, SoftDeleteModel):
+    class Action(models.TextChoices):
+        AGREE = "agree", "Agree"
+        MODIFY = "modify", "Modify"
+        OVERRIDE = "override", "Override"
+        INSUFFICIENT_EVIDENCE = "insufficient_evidence", "Mark insufficient evidence"
+        DISMISS_FLAG = "dismiss_flag", "Dismiss flag"
+        CONFIRM_FLAG = "confirm_flag", "Confirm flag"
+        NOTE = "note", "Add note"
+
     assessment = models.ForeignKey(Assessment, on_delete=models.CASCADE, related_name="modifications")
     criterion = models.ForeignKey(
         AssessmentCriterion,
@@ -93,8 +102,23 @@ class AssessmentModification(UUIDModel, SoftDeleteModel):
         null=True,
         blank=True,
     )
+    viva_question = models.ForeignKey(
+        "viva.VivaQuestion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assessment_modifications",
+    )
+    answer_evaluation = models.ForeignKey(
+        "viva.AnswerEvaluation",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assessment_modifications",
+    )
     reviewer = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True)
-    field_name = models.CharField(max_length=64)
+    action = models.CharField(max_length=32, choices=Action.choices, default=Action.MODIFY)
+    field_name = models.CharField(max_length=64, blank=True)
     old_value = models.JSONField(null=True, blank=True)
     new_value = models.JSONField(null=True, blank=True)
     reason = models.TextField(blank=True)

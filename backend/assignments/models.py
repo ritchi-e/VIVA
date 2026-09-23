@@ -11,8 +11,10 @@ class Assignment(UUIDModel, SoftDeleteModel):
 
     course = models.ForeignKey("courses.Course", on_delete=models.CASCADE, related_name="assignments")
     title = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-    instructions = models.TextField(blank=True)
+    instructions = models.TextField(
+        blank=True,
+        help_text="Student-facing brief. May contain limited HTML (bold, italic, lists).",
+    )
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.DRAFT)
     due_at = models.DateTimeField(null=True, blank=True)
     allow_pdf = models.BooleanField(default=True)

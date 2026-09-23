@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import uuid
 
+from django.utils.html import strip_tags
+
 from ai.service import AIService
 from assignments.models import LearningOutcome
 from orgs.models import Organization
@@ -211,7 +213,7 @@ def plan_questions(
 
     prompt = (
         f"Assignment: {assignment.title}\n"
-        f"Instructions: {assignment.instructions or assignment.description or 'N/A'}\n\n"
+        f"Instructions: {strip_tags(assignment.instructions or '') or 'N/A'}\n\n"
         f"Learning outcomes:\n" + "\n".join(outcome_lines) + "\n\n"
         f"Rubric criteria:\n" + "\n".join(criterion_lines) + "\n\n"
         f"{repo_context}"
@@ -361,6 +363,20 @@ def plan_questions(
             other_concepts=others,
         )
 
+        source_chunk = None
+        resolved_chunk_id = chunk_id or (concept_chunks[0].get("chunk_id") if concept_chunks else None)
+        if resolved_chunk_id:
+            from django.core.exceptions import ValidationError
+            from submissions.models import SubmissionChunk
+
+            try:
+                source_chunk = SubmissionChunk.objects.filter(
+                    submission=submission,
+                    id=resolved_chunk_id,
+                ).first()
+            except (ValidationError, ValueError):
+                source_chunk = None
+
         PlannedQuestion.objects.create(
             plan=plan,
             order=idx,
@@ -373,13 +389,18 @@ def plan_questions(
             source_ref=question.get("source_ref", "") or (concept_chunks[0].get("source_ref") if concept_chunks else ""),
             rubric_criterion=_match_rubric_criterion(question.get("rubric_criterion_name", ""), criteria),
             learning_outcome=_match_learning_outcome(question.get("learning_outcome_code", ""), outcomes),
+            retrieval_query=planning_query,
+            prompt_version="question_plan.v1",
+            model_name=getattr(ai.chat_provider, "model", "") or "",
+            model_provider=type(ai.chat_provider).__name__,
+            source_chunk=source_chunk,
             metadata={
                 "planned_by": "ai",
                 "plan_schema": "question_plan",
                 "source_quote": source_quote,
                 "rag_chunks": concept_chunks,
                 "rag_chunk_ids": _chunk_ids(concept_chunks),
-                "source_chunk_id": chunk_id or (concept_chunks[0].get("chunk_id") if concept_chunks else None),
+                "source_chunk_id": str(source_chunk.id) if source_chunk else resolved_chunk_id,
                 "quality": quality,
                 "grounding_reason": question.get("_grounding_reason") or "valid",
             },

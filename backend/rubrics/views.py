@@ -13,6 +13,7 @@ from rubrics.serializers import (
     RubricCriterionSerializer,
     RubricSerializer,
 )
+from rubrics.templates import list_criterion_library, list_templates
 
 
 class RubricViewSet(TenantContextMixin, viewsets.ModelViewSet):
@@ -34,6 +35,15 @@ class RubricViewSet(TenantContextMixin, viewsets.ModelViewSet):
             "rubric",
             str(rubric.id),
             request=self.request,
+        )
+
+    @action(detail=False, methods=["get"], url_path="templates")
+    def templates(self, request):
+        return Response(
+            {
+                "templates": list_templates(),
+                "library": list_criterion_library(),
+            }
         )
 
     @action(detail=True, methods=["get", "post"], url_path="criteria")

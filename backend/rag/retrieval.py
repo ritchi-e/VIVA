@@ -95,6 +95,7 @@ def retrieve_similar_chunks(
     organization_id=None,
     top_k: int = 8,
     query_text: str = "",
+    viva_question_id=None,
 ) -> list[dict[str, Any]]:
     start = time.monotonic()
     pg_hits = _pgvector_search(submission_id, query_vector, organization_id, top_k)
@@ -167,6 +168,7 @@ def retrieve_similar_chunks(
     RETRIEVAL_LATENCY.observe(time.monotonic() - start)
     RetrievalLog.objects.create(
         submission_id=submission_id,
+        viva_question_id=viva_question_id,
         query=query_text or "vector_query",
         results=results,
         filters={"organization_id": str(organization_id) if organization_id else None, "hybrid": True},

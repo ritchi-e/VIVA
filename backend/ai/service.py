@@ -27,9 +27,12 @@ COST_PER_1K = {
 
 
 class AIService:
-    def __init__(self, organization=None, user=None):
+    def __init__(self, organization=None, user=None, viva_session=None, viva_question=None, submission=None):
         self.organization = organization
         self.user = user
+        self.viva_session = viva_session
+        self.viva_question = viva_question
+        self.submission = submission
         self.chat_provider = get_chat_provider()
         self.embedding_provider = get_embedding_provider()
 
@@ -45,6 +48,9 @@ class AIService:
             request_type=request_type,
             organization=self.organization,
             user=self.user,
+            viva_session=self.viva_session,
+            viva_question=self.viva_question,
+            submission=self.submission,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             estimated_cost_usd=self._estimate_cost(provider, "chat" if "embed" not in request_type else "embedding",
@@ -54,6 +60,20 @@ class AIService:
             error_message=error_message,
             metadata=metadata or {},
         )
+
+    def log_external(
+        self,
+        *,
+        provider: str,
+        model: str,
+        request_type: str,
+        latency_ms: int = 0,
+        success: bool = True,
+        error_message: str = "",
+        metadata: dict | None = None,
+    ):
+        """Log TTS/STT (or other) calls that bypass chat/embedding providers."""
+        self._log(provider, model, request_type, 0, 0, latency_ms, success, error_message, metadata)
 
     def chat(self, messages: list[dict[str, str]], **kwargs):
         start = time.monotonic()

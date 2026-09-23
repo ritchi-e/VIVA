@@ -1,10 +1,19 @@
 from rest_framework import serializers
 
-from assessments.models import Assessment, AssessmentCriterion
-from viva.models import AnswerEvaluation, VivaQuestion
+from assessments.models import Assessment, AssessmentCriterion, AssessmentEvidence
+from viva.models import VivaQuestion
+
+
+class AssessmentEvidenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssessmentEvidence
+        fields = ("id", "source_ref", "quote", "note", "answer")
+        read_only_fields = fields
 
 
 class AssessmentCriterionSerializer(serializers.ModelSerializer):
+    evidence_items = AssessmentEvidenceSerializer(many=True, read_only=True)
+
     class Meta:
         model = AssessmentCriterion
         fields = (
@@ -19,6 +28,7 @@ class AssessmentCriterionSerializer(serializers.ModelSerializer):
             "confidence",
             "explanation",
             "ai_explanation",
+            "evidence_items",
         )
         read_only_fields = ("id",)
 
@@ -39,6 +49,10 @@ class AssessmentQuestionReviewSerializer(serializers.Serializer):
     depth = serializers.FloatField(allow_null=True)
     relevance = serializers.FloatField(allow_null=True)
     requires_follow_up = serializers.BooleanField(allow_null=True)
+    confidence = serializers.CharField(allow_blank=True, allow_null=True)
+    evidence_quality = serializers.CharField(allow_blank=True, allow_null=True)
+    evaluation_version = serializers.IntegerField(allow_null=True)
+    is_ai_generated = serializers.BooleanField(allow_null=True)
 
 
 class AssessmentSerializer(serializers.ModelSerializer):
@@ -87,7 +101,7 @@ class AssessmentSerializer(serializers.ModelSerializer):
             return []
         questions = (
             VivaQuestion.objects.filter(session_id=obj.viva_session_id)
-            .prefetch_related("attempts__answers__evaluation")
+            .prefetch_related("attempts__answers__evaluations")
             .order_by("sequence")
         )
         reviews = []
@@ -95,12 +109,7 @@ class AssessmentSerializer(serializers.ModelSerializer):
             provenance = question.provenance or {}
             attempt = question.attempts.order_by("-attempt_number").first()
             answer = attempt.answers.order_by("-submitted_at").first() if attempt else None
-            evaluation = None
-            if answer:
-                try:
-                    evaluation = answer.evaluation
-                except AnswerEvaluation.DoesNotExist:
-                    evaluation = None
+            evaluation = answer.current_evaluation if answer else None
             reviews.append(
                 {
                     "question_id": question.id,
@@ -118,6 +127,10 @@ class AssessmentSerializer(serializers.ModelSerializer):
                     "depth": evaluation.depth if evaluation else None,
                     "relevance": evaluation.relevance if evaluation else None,
                     "requires_follow_up": evaluation.requires_follow_up if evaluation else None,
+                    "confidence": evaluation.confidence if evaluation else None,
+                    "evidence_quality": evaluation.evidence_quality if evaluation else None,
+                    "evaluation_version": evaluation.version if evaluation else None,
+                    "is_ai_generated": evaluation.is_ai_generated if evaluation else None,
                 }
             )
         return AssessmentQuestionReviewSerializer(reviews, many=True).data
@@ -128,3 +141,12 @@ class AssessmentModifySerializer(serializers.Serializer):
     criterion_id = serializers.UUIDField(required=False)
     new_value = serializers.JSONField()
     reason = serializers.CharField(required=False, allow_blank=True)
+
+
+class QuestionReviewActionSerializer(serializers.Serializer):
+    viva_question_id = serializers.UUIDField()
+    action = serializers.ChoiceField(
+        choices=["agree", "modify", "override", "insufficient_evidence", "note"]
+    )
+    new_value = serializers.JSONField(required=False)
+    reason = serializers.CharField(required=False, allow_blank=True, default="")

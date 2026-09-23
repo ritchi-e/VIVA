@@ -11,8 +11,12 @@ from submissions.text_sanitize import sanitize_json, sanitize_text
 logger = logging.getLogger(__name__)
 
 
+EXTRACTOR_VERSION = "pdf-v1"
+
+
 class PdfAdapter(BaseSubmissionAdapter):
     file_type = "pdf"
+    extractor_version = EXTRACTOR_VERSION
 
     def extract(self, data: bytes, filename: str) -> ExtractedDocument:
         if not data or not data.lstrip().startswith(b"%PDF"):

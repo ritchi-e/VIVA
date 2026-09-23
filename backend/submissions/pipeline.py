@@ -126,32 +126,224 @@ def extract_submission(submission: Submission) -> list[tuple[SubmissionFile | No
         sf.extracted_text = text
         sf.structure = structure
         sf.checksum = hashlib.sha256(data).hexdigest()
-        sf.save(update_fields=["extracted_text", "structure", "checksum", "updated_at"])
+        sf.extractor_version = getattr(adapter, "extractor_version", "") or ""
+        sf.save(update_fields=["extracted_text", "structure", "checksum", "extractor_version", "updated_at"])
         extracted.append((sf, text, structure))
     return extracted
+
+
+def _append_chunk(
+    chunks: list[SubmissionChunk],
+    *,
+    submission: Submission,
+    sf: SubmissionFile | None,
+    index: int,
+    piece: str,
+    source_ref: str,
+    path: str,
+    page_number: int | None = None,
+    section_heading: str = "",
+    slide_number: int | None = None,
+    inner_path: str = "",
+    start_offset: int | None = None,
+    end_offset: int | None = None,
+    structure: dict | None = None,
+) -> int:
+    digest = hashlib.sha256(piece.encode("utf-8")).hexdigest()
+    chunks.append(
+        SubmissionChunk(
+            submission=submission,
+            file=sf,
+            chunk_index=index,
+            content=piece,
+            token_count=len(piece.split()),
+            metadata=sanitize_json(
+                {
+                    "structure": structure or {},
+                    "path": path,
+                    "page_number": page_number,
+                    "slide_number": slide_number,
+                    "inner_path": inner_path,
+                }
+            ),
+            source_ref=source_ref,
+            path=path,
+            content_hash=digest,
+            chunk_kind=SubmissionChunk.ChunkKind.DOCUMENT if sf else SubmissionChunk.ChunkKind.FALLBACK,
+            page_number=page_number,
+            section_heading=section_heading or "",
+            slide_number=slide_number,
+            inner_path=inner_path or "",
+            start_offset=start_offset,
+            end_offset=end_offset,
+        )
+    )
+    return index + 1
+
+
+def _chunk_region(
+    chunks: list[SubmissionChunk],
+    *,
+    submission: Submission,
+    sf: SubmissionFile | None,
+    index: int,
+    text: str,
+    source_ref: str,
+    path: str,
+    page_number: int | None = None,
+    section_heading: str = "",
+    slide_number: int | None = None,
+    inner_path: str = "",
+    structure: dict | None = None,
+) -> int:
+    clean = sanitize_text(re.sub(r"\s+", " ", text).strip())
+    if not clean:
+        return index
+    start = 0
+    while start < len(clean):
+        end = min(len(clean), start + CHUNK_SIZE)
+        piece = clean[start:end]
+        index = _append_chunk(
+            chunks,
+            submission=submission,
+            sf=sf,
+            index=index,
+            piece=piece,
+            source_ref=source_ref,
+            path=path,
+            page_number=page_number,
+            section_heading=section_heading,
+            slide_number=slide_number,
+            inner_path=inner_path,
+            start_offset=start,
+            end_offset=end,
+            structure=structure,
+        )
+        if end >= len(clean):
+            break
+        start = max(0, end - CHUNK_OVERLAP)
+    return index
 
 
 def _file_chunks(submission: Submission, extracted: Iterable[tuple[SubmissionFile | None, str, dict]]) -> list[SubmissionChunk]:
     chunks: list[SubmissionChunk] = []
     index = 0
     for sf, text, structure in extracted:
-        for piece in _chunk_text(text):
-            digest = hashlib.sha256(piece.encode("utf-8")).hexdigest()
-            chunks.append(
-                SubmissionChunk(
+        structure = structure or {}
+        filename = sf.original_filename if sf else (submission.github_url or "")
+        pages = structure.get("pages") if isinstance(structure.get("pages"), list) else None
+        slides = structure.get("slides") if isinstance(structure.get("slides"), list) else None
+        zip_files = structure.get("files") if isinstance(structure.get("files"), list) else None
+
+        if pages:
+            for page in pages:
+                page_text = page.get("text") or ""
+                page_number = page.get("page")
+                source_ref = f"{filename}#page={page_number}" if page_number else filename
+                index = _chunk_region(
+                    chunks,
                     submission=submission,
-                    file=sf,
-                    chunk_index=index,
-                    content=piece,
-                    token_count=len(piece.split()),
-                    metadata=sanitize_json({"structure": structure, "path": sf.original_filename if sf else ""}),
-                    source_ref=sf.original_filename if sf else submission.github_url,
-                    path=sf.original_filename if sf else "",
-                    content_hash=digest,
-                    chunk_kind=SubmissionChunk.ChunkKind.DOCUMENT if sf else SubmissionChunk.ChunkKind.FALLBACK,
+                    sf=sf,
+                    index=index,
+                    text=page_text,
+                    source_ref=source_ref,
+                    path=filename,
+                    page_number=page_number if isinstance(page_number, int) else None,
+                    structure=structure,
                 )
-            )
-            index += 1
+            continue
+
+        if slides:
+            for slide in slides:
+                slide_number = slide.get("slide")
+                slide_text = "\n".join(slide.get("texts") or [])
+                source_ref = f"{filename}#slide={slide_number}" if slide_number else filename
+                index = _chunk_region(
+                    chunks,
+                    submission=submission,
+                    sf=sf,
+                    index=index,
+                    text=slide_text,
+                    source_ref=source_ref,
+                    path=filename,
+                    slide_number=slide_number if isinstance(slide_number, int) else None,
+                    structure=structure,
+                )
+            continue
+
+        if zip_files and "--- " in (text or ""):
+            # Prefer per-file regions from the merged ZIP text when available.
+            parts = re.split(r"(?m)^--- (.+?) ---\n", text or "")
+            # parts: ["", path1, content1, path2, content2, ...]
+            if len(parts) > 1:
+                for i in range(1, len(parts), 2):
+                    inner_path = parts[i]
+                    content = parts[i + 1] if i + 1 < len(parts) else ""
+                    source_ref = f"{filename}:{inner_path}"
+                    index = _chunk_region(
+                        chunks,
+                        submission=submission,
+                        sf=sf,
+                        index=index,
+                        text=content,
+                        source_ref=source_ref,
+                        path=filename,
+                        inner_path=inner_path,
+                        structure=structure,
+                    )
+                continue
+
+        paragraphs = structure.get("paragraphs") if isinstance(structure.get("paragraphs"), list) else None
+        if paragraphs:
+            # Group paragraphs into chunk-sized regions while preserving section_heading when present.
+            buffer = ""
+            heading = ""
+            for para in paragraphs:
+                para_text = str(para or "").strip()
+                if not para_text:
+                    continue
+                if len(para_text) < 80 and para_text.isupper():
+                    heading = para_text
+                candidate = f"{buffer}\n\n{para_text}".strip() if buffer else para_text
+                if len(candidate) > CHUNK_SIZE and buffer:
+                    index = _chunk_region(
+                        chunks,
+                        submission=submission,
+                        sf=sf,
+                        index=index,
+                        text=buffer,
+                        source_ref=filename,
+                        path=filename,
+                        section_heading=heading,
+                        structure=structure,
+                    )
+                    buffer = para_text
+                else:
+                    buffer = candidate
+            if buffer:
+                index = _chunk_region(
+                    chunks,
+                    submission=submission,
+                    sf=sf,
+                    index=index,
+                    text=buffer,
+                    source_ref=filename,
+                    path=filename,
+                    section_heading=heading,
+                    structure=structure,
+                )
+            continue
+
+        index = _chunk_region(
+            chunks,
+            submission=submission,
+            sf=sf,
+            index=index,
+            text=text or "",
+            source_ref=filename,
+            path=filename,
+            structure=structure,
+        )
     return chunks
 
 

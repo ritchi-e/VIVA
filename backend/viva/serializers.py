@@ -15,12 +15,17 @@ class AnswerEvaluationSerializer(serializers.ModelSerializer):
             "overall",
             "requires_follow_up",
             "explanation",
+            "confidence",
+            "evidence_quality",
+            "version",
+            "is_current",
         )
         read_only_fields = fields
 
 
 class StudentAnswerSerializer(serializers.ModelSerializer):
-    evaluation = AnswerEvaluationSerializer(read_only=True)
+    evaluation = serializers.SerializerMethodField()
+    current_evaluation = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentAnswer
@@ -30,8 +35,21 @@ class StudentAnswerSerializer(serializers.ModelSerializer):
             "input_mode",
             "submitted_at",
             "evaluation",
+            "current_evaluation",
+            "duration_seconds",
+            "metadata",
         )
         read_only_fields = fields
+
+    def get_current_evaluation(self, obj):
+        evaluation = obj.current_evaluation
+        if not evaluation:
+            return None
+        return AnswerEvaluationSerializer(evaluation).data
+
+    def get_evaluation(self, obj):
+        # Backward-compatible alias for current evaluation.
+        return self.get_current_evaluation(obj)
 
 
 class VivaQuestionSerializer(serializers.ModelSerializer):
@@ -52,6 +70,10 @@ class VivaQuestionSerializer(serializers.ModelSerializer):
             "excerpt",
             "asked_at",
             "student_answer",
+            "retrieval_query",
+            "prompt_version",
+            "model_name",
+            "model_provider",
         )
         read_only_fields = fields
 
@@ -208,3 +230,6 @@ class AnswerSubmitSerializer(serializers.Serializer):
     question_id = serializers.UUIDField()
     text = serializers.CharField()
     input_mode = serializers.CharField(default="text")
+    audio_storage_key = serializers.CharField(required=False, allow_blank=True, default="")
+    duration_seconds = serializers.FloatField(required=False, allow_null=True)
+    metadata = serializers.JSONField(required=False)

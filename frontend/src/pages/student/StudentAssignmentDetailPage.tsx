@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/layout/StateViews'
 import { getApiErrorMessage } from '@/lib/api'
 import { formatSubmissionProcessingError } from '@/lib/userErrors'
 import { PLATFORM_PROGRESS, SUBMISSION_STAGE_COPY } from '@/lib/progressCopy'
+import { InstructionsHtml } from '@/components/ui/RichTextInstructions'
 
 const GITHUB_URL_RE = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/?$/
 const ACTIVE_STATUSES = new Set(['uploaded', 'queued', 'processing'])
@@ -87,14 +88,15 @@ export function StudentAssignmentDetailPage() {
       <PageHeader title={assignment.data.title} description="Submit work, then book a viva slot when processing is complete." />
       <Card className="mb-6">
         <CardBody className="space-y-2 text-sm text-slate-700">
-          <p>{assignment.data.description}</p>
-          <p className="whitespace-pre-wrap">{assignment.data.instructions}</p>
+          <InstructionsHtml html={assignment.data.instructions} />
         </CardBody>
       </Card>
       <Card className="mb-6">
         <CardBody className="space-y-3">
           <p className="text-sm font-medium text-slate-900">Submit work</p>
           <Input
+            id="submission-file"
+            label="Upload file"
             type="file"
             ref={fileRef}
             accept=".pdf,.docx,.pptx,.zip,application/pdf"
@@ -102,6 +104,8 @@ export function StudentAssignmentDetailPage() {
           />
           {allowGithub ? (
             <Input
+              id="github-url"
+              label="GitHub repository (optional)"
               value={githubUrl}
               onChange={(e) => setGithubUrl(e.target.value)}
               placeholder="https://github.com/org/repo"

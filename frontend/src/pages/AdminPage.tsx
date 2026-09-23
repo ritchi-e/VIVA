@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { ProgressPanel } from '@/components/ui/Spinner'
 import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { formatDate } from '@/lib/utils'
 
 interface AuditEntry {
@@ -38,6 +39,7 @@ export function AdminPage() {
   const [role, setRole] = useState('student')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [pendingDeactivate, setPendingDeactivate] = useState<MembershipRecord | null>(null)
 
   const entries: AuditEntry[] = useMemo(() => {
     const data = audit.data
@@ -175,13 +177,23 @@ export function AdminPage() {
                         </Badge>
                       </td>
                       <td className="py-3">
-                        <Button
-                          variant="ghost"
-                          disabled={saving}
-                          onClick={() => setMemberActive(m.id, !m.is_active)}
-                        >
-                          {m.is_active ? 'Deactivate' : 'Activate'}
-                        </Button>
+                        {m.is_active ? (
+                          <Button
+                            variant="ghost"
+                            disabled={saving}
+                            onClick={() => setPendingDeactivate(m)}
+                          >
+                            Deactivate
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            disabled={saving}
+                            onClick={() => setMemberActive(m.id, true)}
+                          >
+                            Activate
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -257,6 +269,20 @@ export function AdminPage() {
           )}
         </CardBody>
       </Card>
+
+      <ConfirmDialog
+        open={Boolean(pendingDeactivate)}
+        title="Deactivate member?"
+        description={`${pendingDeactivate?.user?.email || 'This member'} will lose access to the organization until reactivated.`}
+        confirmLabel="Deactivate member"
+        danger
+        loading={saving}
+        onCancel={() => setPendingDeactivate(null)}
+        onConfirm={() => {
+          if (!pendingDeactivate) return
+          void setMemberActive(pendingDeactivate.id, false).then(() => setPendingDeactivate(null))
+        }}
+      />
     </div>
   )
 }

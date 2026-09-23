@@ -20,11 +20,11 @@ class AssignmentAlignmentTests(TestCase):
             organization=self.org, code="A100", title="Align", created_by=self.instructor
         )
 
-    def _submission(self, title: str, description: str, filename: str, text: str) -> Submission:
+    def _submission(self, title: str, instructions: str, filename: str, text: str) -> Submission:
         assignment = Assignment.objects.create(
             course=self.course,
             title=title,
-            description=description,
+            instructions=instructions,
             status=Assignment.Status.PUBLISHED,
             created_by=self.instructor,
         )
@@ -48,7 +48,7 @@ class AssignmentAlignmentTests(TestCase):
     def test_unrelated_software_report_is_flagged(self):
         submission = self._submission(
             title="Machine Learning Project",
-            description="Train a neural classifier on an image dataset.",
+            instructions="Train a neural classifier on an image dataset.",
             filename="sde-report.pdf",
             text="This SDE project implements a Django REST API and React frontend for a ticketing microservice.",
         )
@@ -59,7 +59,7 @@ class AssignmentAlignmentTests(TestCase):
     def test_related_submission_is_not_flagged(self):
         submission = self._submission(
             title="Machine Learning Project",
-            description="Train a neural classifier on an image dataset.",
+            instructions="Train a neural classifier on an image dataset.",
             filename="ml-report.pdf",
             text="We trained a CNN image classifier on a labelled dataset and report model accuracy.",
         )

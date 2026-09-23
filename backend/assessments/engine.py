@@ -37,6 +37,7 @@ ASSESSMENT_SCHEMA = {
 def generate_assessment_for_session(session: VivaSession, organization: Organization) -> Assessment:
     evaluations = AnswerEvaluation.objects.filter(
         answer__attempt__question__session=session,
+        is_current=True,
     ).select_related("answer__attempt__question")
     summary_lines = []
     for ev in evaluations:
@@ -101,22 +102,70 @@ def generate_assessment_for_session(session: VivaSession, organization: Organiza
             {"name": c.name, "ai_score": avg, "explanation": f"AI draft for {c.name}"}
             for c in rubric_criteria
         ]
+    created_criteria = []
     for crit in criteria_payload:
         name = crit.get("name", "Criterion")
         rc = rubric_map.get(name)
-        AssessmentCriterion.objects.create(
-            assessment=assessment,
-            rubric_criterion=rc,
-            name=name,
-            category=rc.category if rc else "",
-            ai_score=float(crit.get("ai_score", 0)),
-            final_score=float(crit.get("ai_score", 0)),
-            max_score=float(rc.max_score) if rc else 10,
-            weight=float(rc.weight) if rc else 1,
-            ai_explanation=crit.get("explanation", ""),
-            explanation=crit.get("explanation", ""),
+        created_criteria.append(
+            AssessmentCriterion.objects.create(
+                assessment=assessment,
+                rubric_criterion=rc,
+                name=name,
+                category=rc.category if rc else "",
+                ai_score=float(crit.get("ai_score", 0)),
+                final_score=float(crit.get("ai_score", 0)),
+                max_score=float(rc.max_score) if rc else 10,
+                weight=float(rc.weight) if rc else 1,
+                ai_explanation=crit.get("explanation", ""),
+                explanation=crit.get("explanation", ""),
+            )
         )
+    populate_assessment_evidence(assessment, list(evaluations), created_criteria)
     return assessment
+
+
+def populate_assessment_evidence(
+    assessment: Assessment,
+    evaluations: list[AnswerEvaluation],
+    criteria: list[AssessmentCriterion],
+) -> None:
+    """Materialize AssessmentEvidence rows from evaluation evidence_refs."""
+    from assessments.models import AssessmentEvidence
+    from submissions.models import SubmissionChunk
+
+    AssessmentEvidence.objects.filter(criterion__assessment=assessment).delete()
+    if not evaluations or not criteria:
+        return
+
+    chunk_ids: list[str] = []
+    for ev in evaluations:
+        chunk_ids.extend(str(ref) for ref in (ev.evidence_refs or []) if ref)
+    chunks = {
+        str(chunk.id): chunk
+        for chunk in SubmissionChunk.objects.filter(
+            submission_id=assessment.submission_id,
+            id__in=chunk_ids,
+        )
+    }
+    if not chunks:
+        return
+
+    # Distribute evidence across criteria round-robin when criterion-level mapping is unavailable.
+    criterion_index = 0
+    for ev in evaluations:
+        for ref in ev.evidence_refs or []:
+            chunk = chunks.get(str(ref))
+            if not chunk:
+                continue
+            criterion = criteria[criterion_index % len(criteria)]
+            criterion_index += 1
+            AssessmentEvidence.objects.create(
+                criterion=criterion,
+                answer=ev.answer,
+                source_ref=chunk.source_ref or chunk.path or "",
+                quote=(chunk.content or "")[:500],
+                note=f"From Q{ev.answer.attempt.question.sequence} evaluation",
+            )
 
 
 def apply_assessment_modification(
@@ -155,6 +204,7 @@ def apply_assessment_modification(
         assessment=assessment,
         criterion=criterion,
         reviewer=reviewer,
+        action=AssessmentModification.Action.MODIFY,
         field_name=field_name,
         old_value=old_value,
         new_value=new_value,
@@ -162,6 +212,35 @@ def apply_assessment_modification(
     )
     return mod
 
+
+def record_question_override(
+    assessment: Assessment,
+    reviewer,
+    *,
+    viva_question,
+    action: str,
+    new_value=None,
+    reason: str = "",
+    answer_evaluation=None,
+) -> AssessmentModification:
+    """Record a per-question instructor review action without inventing a second override model."""
+    from django.utils import timezone as tz
+
+    assessment.status = Assessment.Status.MODIFIED
+    assessment.reviewed_by = reviewer
+    assessment.reviewed_at = tz.now()
+    assessment.save(update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"])
+    return AssessmentModification.objects.create(
+        assessment=assessment,
+        viva_question=viva_question,
+        answer_evaluation=answer_evaluation,
+        reviewer=reviewer,
+        action=action,
+        field_name="question_review",
+        old_value=None,
+        new_value=new_value,
+        reason=reason,
+    )
 
 def finalize_assessment(assessment: Assessment, reviewer, instructor_notes: str | None = None) -> Assessment:
     if instructor_notes is not None:

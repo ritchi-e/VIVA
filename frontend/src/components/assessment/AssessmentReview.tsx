@@ -2,34 +2,41 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { assessmentsApi } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
-import { Card, CardBody, CardHeader } from '@/components/ui/Card'
+import { Card, CardBody } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Badge } from '@/components/ui/Badge'
 import type { Assessment } from '@/types'
-import { formatDate, formatScore } from '@/lib/utils'
+import { cn, formatDate, formatScore } from '@/lib/utils'
 import { getApiErrorMessage } from '@/lib/api'
+import { Alert } from '@/components/ui/Alert'
 
 interface AssessmentReviewProps {
   assessment: Assessment
   onUpdated: (next: Assessment) => void
+  compact?: boolean
 }
 
-function ListSection({ title, items }: { title: string; items?: string[] }) {
+function ChipList({ title, items }: { title: string; items?: string[] }) {
   if (!items?.length) return null
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</p>
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+      <p className="text-xs font-medium text-[var(--color-muted)]">{title}</p>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
         {items.map((item) => (
-          <li key={item}>{item}</li>
+          <span
+            key={item}
+            className="rounded-full bg-[var(--color-surface)] px-2.5 py-1 text-xs text-[var(--color-foreground)]"
+          >
+            {item}
+          </span>
         ))}
-      </ul>
+      </div>
     </div>
   )
 }
 
-export function AssessmentReview({ assessment, onUpdated }: AssessmentReviewProps) {
+export function AssessmentReview({ assessment, onUpdated, compact = false }: AssessmentReviewProps) {
   const [notes, setNotes] = useState(assessment.instructor_notes ?? '')
   const [scores, setScores] = useState<Record<string, number>>(() =>
     Object.fromEntries(
@@ -38,6 +45,10 @@ export function AssessmentReview({ assessment, onUpdated }: AssessmentReviewProp
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [openQuestionId, setOpenQuestionId] = useState<string | null>(
+    assessment.question_reviews?.[0]?.question_id ?? null,
+  )
 
   const saveCriterion = async (criterionId: string) => {
     setSaving(true)
@@ -55,12 +66,38 @@ export function AssessmentReview({ assessment, onUpdated }: AssessmentReviewProp
     }
   }
 
+  const reviewQuestion = async (
+    questionId: string,
+    action: 'agree' | 'override' | 'insufficient_evidence' | 'note',
+  ) => {
+    setSaving(true)
+    setError(null)
+    try {
+      const { data } = await assessmentsApi.reviewQuestion(assessment.id, {
+        viva_question_id: questionId,
+        action,
+        reason:
+          action === 'agree'
+            ? 'Instructor agrees with AI evaluation'
+            : action === 'insufficient_evidence'
+              ? 'Instructor marked insufficient evidence'
+              : 'Instructor review note',
+      })
+      onUpdated(data)
+    } catch (err) {
+      setError(getApiErrorMessage(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const finalize = async () => {
     setSaving(true)
     setError(null)
     try {
       const { data } = await assessmentsApi.finalize(assessment.id, { instructor_notes: notes })
       onUpdated(data)
+      setSuccess('Assessment finalized. The student can see the final result.')
     } catch (err) {
       setError(getApiErrorMessage(err))
     } finally {
@@ -72,187 +109,230 @@ export function AssessmentReview({ assessment, onUpdated }: AssessmentReviewProp
   const questionReviews = assessment.question_reviews ?? []
 
   return (
-    <div className="space-y-6">
+    <div className={cn('space-y-4', compact && 'space-y-3')}>
       <Card>
-        <CardHeader
-          title="Overall assessment"
-          description={assessment.disclaimer || 'AI-generated assessment based on the viva session. Instructor review required.'}
-          action={<Badge tone={finalized ? 'success' : 'warning'}>{assessment.status.replace(/_/g, ' ')}</Badge>}
-        />
-        <CardBody className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <CardBody className="space-y-3 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs text-slate-500">AI overall</p>
-              <p className="text-2xl font-semibold text-slate-900">{formatScore(assessment.ai_overall_score)}</p>
+              <p className="text-sm font-semibold text-[var(--color-foreground)]">Decision</p>
+              <p className="mt-0.5 max-w-2xl text-sm text-[var(--color-muted)]">
+                AI suggests a score. You remain the academic authority — accept, adjust, or mark
+                insufficient evidence before finalizing.
+              </p>
             </div>
-            <div>
-              <p className="text-xs text-slate-500">Current overall</p>
-              <p className="text-2xl font-semibold text-slate-900">{formatScore(assessment.overall_score)}</p>
+            <Badge tone={finalized ? 'success' : 'warning'}>{assessment.status.replace(/_/g, ' ')}</Badge>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
+              <p className="text-xs font-medium text-[var(--color-muted)]">AI assessment</p>
+              <p className="mt-1 text-2xl font-semibold">{formatScore(assessment.ai_overall_score)}</p>
+              <Badge className="mt-2">Suggested</Badge>
             </div>
-            <div>
-              <p className="text-xs text-slate-500">Student</p>
-              <p className="text-sm font-medium text-slate-900">{assessment.student_name || '—'}</p>
+            <div className="rounded-xl border border-[var(--color-primary)]/30 bg-[var(--color-sidebar-active)] px-3 py-3">
+              <p className="text-xs font-medium text-[var(--color-muted)]">Instructor decision</p>
+              <p className="mt-1 text-2xl font-semibold text-[var(--color-primary)]">
+                {formatScore(assessment.overall_score)}
+              </p>
+              <Badge tone={finalized ? 'success' : 'warning'} className="mt-2">
+                {finalized ? 'Final' : 'Not finalized'}
+              </Badge>
             </div>
-            <div>
-              <p className="text-xs text-slate-500">Assignment</p>
-              <p className="text-sm font-medium text-slate-900">{assessment.assignment_title || '—'}</p>
+            <div className="rounded-xl border border-[var(--color-border)] bg-white px-3 py-3">
+              <p className="text-xs font-medium text-[var(--color-muted)]">Context</p>
+              <p className="mt-1 truncate text-sm font-medium">
+                {assessment.student_name || '—'}
+              </p>
+              <p className="truncate text-sm text-[var(--color-muted)]">
+                {assessment.assignment_title || '—'}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                {assessment.viva_session ? (
+                  <Link to={`/viva-sessions/${assessment.viva_session}`} className="mk-link">
+                    Open viva dialogue
+                  </Link>
+                ) : null}
+                {assessment.submission ? (
+                  <Link to={`/submissions/${assessment.submission}?tab=evidence`} className="mk-link">
+                    View evidence
+                  </Link>
+                ) : null}
+              </div>
             </div>
           </div>
 
-          {assessment.viva_session ? (
-            <p className="text-sm text-slate-600">
-              Based on viva session{' '}
-              <Link to={`/viva-sessions/${assessment.viva_session}`} className="text-blue-700 hover:underline">
-                view dialogue
-              </Link>
+          {assessment.evidence_summary ? (
+            <p className="text-sm text-[var(--color-foreground)]">
+              <span className="font-medium">Evidence: </span>
+              {assessment.evidence_summary}
             </p>
           ) : null}
 
-          {assessment.evidence_summary ? (
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Evidence summary</p>
-              <p className="mt-2 text-sm text-slate-700">{assessment.evidence_summary}</p>
-            </div>
-          ) : null}
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ListSection title="Strengths" items={assessment.strengths} />
-            <ListSection title="Weaknesses" items={assessment.weaknesses} />
-            <ListSection title="Areas requiring review" items={assessment.areas_requiring_review} />
-            <ListSection title="Unanswered areas" items={assessment.unanswered_areas} />
-            <ListSection title="Recommended follow-ups" items={assessment.recommended_followups} />
+          <div className="grid gap-3 lg:grid-cols-2">
+            <ChipList title="Strengths" items={assessment.strengths} />
+            <ChipList title="Weaknesses" items={assessment.weaknesses} />
+            <ChipList title="Needs review" items={assessment.areas_requiring_review} />
+            <ChipList title="Unanswered" items={assessment.unanswered_areas} />
           </div>
 
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
+          {success ? <Alert tone="success" title={success} /> : null}
         </CardBody>
       </Card>
 
-      <div>
-        <h2 className="mb-3 text-lg font-semibold text-slate-900">Per-question review</h2>
-        {questionReviews.length === 0 ? (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardBody className="space-y-2 py-4">
+            <p className="text-sm font-semibold">Per-question</p>
+            {questionReviews.length === 0 ? (
+              <p className="text-sm text-[var(--color-muted)]">No linked viva answers yet.</p>
+            ) : (
+              <div className="max-h-[58vh] space-y-2 overflow-y-auto pr-1">
+                {questionReviews.map((review) => {
+                  const open = openQuestionId === review.question_id
+                  return (
+                    <div
+                      key={review.question_id}
+                      className="rounded-xl border border-[var(--color-border)] bg-white"
+                    >
+                      <button
+                        type="button"
+                        className="flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left"
+                        onClick={() => setOpenQuestionId(open ? null : review.question_id)}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge>Q{review.sequence}</Badge>
+                            {review.evaluation_overall != null ? (
+                              <span className="text-sm font-semibold">
+                                {formatScore(review.evaluation_overall)}/10
+                              </span>
+                            ) : null}
+                            {review.confidence ? (
+                              <Badge tone="warning">{review.confidence.replace(/_/g, ' ')}</Badge>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-sm">{review.question_text}</p>
+                        </div>
+                        <span className="shrink-0 text-xs text-[var(--color-muted)]">{open ? 'Hide' : 'Show'}</span>
+                      </button>
+                      {open ? (
+                        <div className="space-y-2 border-t border-[var(--color-border)] px-3 py-3">
+                          <div className="rounded-lg bg-[var(--color-surface)] p-2.5">
+                            <p className="text-xs font-medium text-[var(--color-muted)]">Student answer</p>
+                            {review.answer_text ? (
+                              <p className="mt-1 whitespace-pre-wrap text-sm">{review.answer_text}</p>
+                            ) : (
+                              <p className="mt-1 text-sm text-[var(--color-muted)]">No answer recorded.</p>
+                            )}
+                            {review.answered_at ? (
+                              <p className="mt-1 text-xs text-[var(--color-muted)]">
+                                {review.input_mode === 'voice' ? 'Voice' : 'Text'} · {formatDate(review.answered_at)}
+                              </p>
+                            ) : null}
+                          </div>
+                          {review.evaluation_explanation ? (
+                            <p className="text-sm">
+                              <span className="font-medium">AI: </span>
+                              {review.evaluation_explanation}
+                            </p>
+                          ) : null}
+                          {!finalized ? (
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                variant="secondary"
+                                loading={saving}
+                                onClick={() => reviewQuestion(review.question_id, 'agree')}
+                              >
+                                Agree
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                loading={saving}
+                                onClick={() => reviewQuestion(review.question_id, 'insufficient_evidence')}
+                              >
+                                Insufficient evidence
+                              </Button>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+
+        <div className="space-y-4">
           <Card>
-            <CardBody className="text-sm text-slate-600">
-              No viva question answers are linked to this assessment yet.
-            </CardBody>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {questionReviews.map((review) => (
-              <Card key={review.question_id}>
-                <CardBody className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge>Q{review.sequence}</Badge>
-                    <span className="text-xs uppercase tracking-wide text-slate-500">
-                      {review.question_type.replace(/_/g, ' ')}
-                    </span>
-                    {review.evaluation_overall != null ? (
-                      <span className="text-sm font-semibold text-slate-900">
-                        Score {formatScore(review.evaluation_overall)} / 10
-                      </span>
+            <CardBody className="space-y-3 py-4">
+              <p className="text-sm font-semibold">Rubric</p>
+              <div className="max-h-[42vh] space-y-2 overflow-y-auto pr-1">
+                {assessment.criteria.map((criterion) => (
+                  <div
+                    key={criterion.id}
+                    className="rounded-xl border border-[var(--color-border)] px-3 py-2.5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-medium">{criterion.name}</p>
+                      <p className="text-xs text-[var(--color-muted)]">{criterion.category}</p>
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                      <div>
+                        <p className="text-xs text-[var(--color-muted)]">AI</p>
+                        <p className="text-sm font-semibold">
+                          {formatScore(criterion.ai_score, criterion.max_score)}
+                        </p>
+                      </div>
+                      <Input
+                        label="Your score"
+                        type="number"
+                        min={0}
+                        max={criterion.max_score}
+                        step={0.5}
+                        disabled={finalized}
+                        value={scores[criterion.id]}
+                        onChange={(e) =>
+                          setScores((prev) => ({ ...prev, [criterion.id]: Number(e.target.value) }))
+                        }
+                      />
+                      {!finalized ? (
+                        <Button variant="secondary" loading={saving} onClick={() => saveCriterion(criterion.id)}>
+                          Save
+                        </Button>
+                      ) : null}
+                    </div>
+                    {criterion.ai_explanation ? (
+                      <p className="mt-2 line-clamp-2 text-xs text-[var(--color-muted)]">
+                        {criterion.ai_explanation}
+                      </p>
                     ) : null}
                   </div>
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Question</p>
-                    <p className="mt-1 text-sm font-medium text-slate-900">{review.question_text}</p>
-                    {review.concept ? <p className="mt-1 text-xs text-slate-500">Focus: {review.concept}</p> : null}
-                  </div>
-                  <div className="rounded-lg bg-slate-50 p-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Student answer</p>
-                    {review.answer_text ? (
-                      <>
-                        <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">{review.answer_text}</p>
-                        <p className="mt-2 text-xs text-slate-500">
-                          Via {review.input_mode === 'voice' ? 'voice' : 'text'}
-                          {review.answered_at ? ` · ${formatDate(review.answered_at)}` : ''}
-                        </p>
-                      </>
-                    ) : (
-                      <p className="mt-2 text-sm text-slate-500">No answer recorded.</p>
-                    )}
-                  </div>
-                  {review.evaluation_explanation ? (
-                    <p className="text-sm text-slate-700">
-                      <span className="font-medium text-slate-900">AI evaluation: </span>
-                      {review.evaluation_explanation}
-                    </p>
-                  ) : null}
-                  {review.evaluation_overall != null ? (
-                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 sm:grid-cols-4">
-                      <p>Accuracy: {formatScore(review.conceptual_accuracy)}</p>
-                      <p>Evidence: {formatScore(review.evidence_support)}</p>
-                      <p>Depth: {formatScore(review.depth)}</p>
-                      <p>Relevance: {formatScore(review.relevance)}</p>
-                    </div>
-                  ) : null}
-                </CardBody>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+                ))}
+              </div>
+            </CardBody>
+          </Card>
 
-      <div>
-        <h2 className="mb-3 text-lg font-semibold text-slate-900">Rubric criteria</h2>
-        <div className="space-y-4">
-          {assessment.criteria.map((criterion) => (
-            <Card key={criterion.id}>
-              <CardHeader title={criterion.name} description={criterion.category} />
-              <CardBody className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-3 text-sm">
-                  <div>
-                    <p className="text-xs text-slate-500">AI score</p>
-                    <p className="font-medium">{formatScore(criterion.ai_score, criterion.max_score)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Confidence</p>
-                    <p className="font-medium">{(criterion.confidence * 100).toFixed(0)}%</p>
-                  </div>
-                  <div>
-                    <Input
-                      label="Instructor score"
-                      type="number"
-                      min={0}
-                      max={criterion.max_score}
-                      step={0.5}
-                      disabled={finalized}
-                      value={scores[criterion.id]}
-                      onChange={(e) =>
-                        setScores((prev) => ({ ...prev, [criterion.id]: Number(e.target.value) }))
-                      }
-                    />
-                  </div>
-                </div>
-                {criterion.ai_explanation ? (
-                  <p className="text-sm text-slate-600">
-                    <span className="font-medium text-slate-800">AI rationale: </span>
-                    {criterion.ai_explanation}
-                  </p>
-                ) : null}
-                {criterion.explanation ? (
-                  <p className="text-sm text-slate-600">{criterion.explanation}</p>
-                ) : null}
-                {!finalized ? (
-                  <Button variant="secondary" loading={saving} onClick={() => saveCriterion(criterion.id)}>
-                    Save score
-                  </Button>
-                ) : null}
-              </CardBody>
-            </Card>
-          ))}
+          <Card>
+            <CardBody className="space-y-3 py-4">
+              <p className="text-sm font-semibold">Finalize</p>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                disabled={finalized}
+                placeholder="Instructor notes"
+              />
+              {!finalized ? (
+                <Button loading={saving} onClick={finalize}>
+                  Finalize assessment
+                </Button>
+              ) : null}
+            </CardBody>
+          </Card>
         </div>
       </div>
-
-      <Card>
-        <CardHeader title="Instructor notes" />
-        <CardBody className="space-y-3">
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} disabled={finalized} />
-          {!finalized ? (
-            <Button loading={saving} onClick={finalize}>
-              Finalize assessment
-            </Button>
-          ) : null}
-        </CardBody>
-      </Card>
     </div>
   )
 }

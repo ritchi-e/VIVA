@@ -13,6 +13,7 @@ class ExtractedDocument:
 
 class BaseSubmissionAdapter:
     file_type: str = "other"
+    extractor_version: str = "generic-v1"
 
     def extract(self, data: bytes, filename: str) -> ExtractedDocument:
         raise NotImplementedError

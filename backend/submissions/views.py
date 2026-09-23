@@ -40,6 +40,22 @@ class SubmissionViewSet(TenantContextMixin, viewsets.ModelViewSet):
             qs = qs.filter(assignment_id=assignment_id)
         if student_id:
             qs = qs.filter(student_id=student_id)
+
+        # Instructor review lists: one row per student/assignment (latest version).
+        # Pass all_versions=1 to include older resubmissions.
+        all_versions = str(self.request.query_params.get("all_versions", "")).lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        if self.action == "list" and not all_versions and role != "student":
+            latest_ids = (
+                qs.order_by("assignment_id", "student_id", "-version", "-created_at")
+                .distinct("assignment_id", "student_id")
+                .values_list("id", flat=True)
+            )
+            qs = qs.filter(id__in=latest_ids)
+
         return qs.order_by("-created_at")
 
     def get_permissions(self):

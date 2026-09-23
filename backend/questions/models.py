@@ -64,6 +64,17 @@ class PlannedQuestion(UUIDModel, SoftDeleteModel):
         blank=True,
         related_name="follow_ups",
     )
+    retrieval_query = models.TextField(blank=True)
+    prompt_version = models.CharField(max_length=64, blank=True)
+    model_name = models.CharField(max_length=128, blank=True)
+    model_provider = models.CharField(max_length=64, blank=True)
+    source_chunk = models.ForeignKey(
+        "submissions.SubmissionChunk",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:

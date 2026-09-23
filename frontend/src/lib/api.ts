@@ -4,8 +4,12 @@ import type {
   Assessment,
   Assignment,
   AuthTokens,
+  CoverageRow,
   Course,
   DashboardMetrics,
+  EvidenceDashboard,
+  EvidenceFlag,
+  EvidenceQuestionDetail,
   Paginated,
   Rubric,
   StudentSummary,
@@ -190,6 +194,15 @@ export const assignmentsApi = {
   publish: (id: string) => api.post<Assignment>(`/assignments/${id}/publish/`),
 }
 
+export type RubricCriterionPayload = {
+  name: string
+  description?: string
+  weight?: number
+  max_score?: number
+  order?: number
+  category?: string
+}
+
 export const rubricsApi = {
   getForAssignment: (assignmentId: string) =>
     api.get<Rubric>(`/assignments/${assignmentId}/rubric/`).catch(() =>
@@ -200,6 +213,15 @@ export const rubricsApi = {
     ),
   updateForAssignment: (assignmentId: string, data: Partial<Rubric>) =>
     api.patch<Rubric>(`/assignments/${assignmentId}/rubric/`, data),
+  replaceCriteria: (
+    assignmentId: string,
+    data: {
+      title?: string
+      description?: string
+      template_id?: string
+      criteria: RubricCriterionPayload[]
+    },
+  ) => api.post<Rubric>(`/assignments/${assignmentId}/rubric/replace-criteria/`, data),
   addCriterion: (
     rubricId: string,
     data: {
@@ -302,8 +324,38 @@ export const assessmentsApi = {
       new_value: data.instructor_score,
       reason: 'Instructor score adjustment',
     }),
+  reviewQuestion: (
+    assessmentId: string,
+    data: {
+      viva_question_id: string
+      action: 'agree' | 'modify' | 'override' | 'insufficient_evidence' | 'note'
+      new_value?: unknown
+      reason?: string
+    },
+  ) => api.post<Assessment>(`/assessments/${assessmentId}/question-review/`, data),
   finalize: (id: string, data?: { instructor_notes?: string }) =>
     api.post<Assessment>(`/assessments/${id}/finalize/`, data ?? {}),
+}
+
+export const evidenceApi = {
+  dashboard: (submissionId: string) =>
+    api.get<EvidenceDashboard>(`/evidence/submissions/${submissionId}/dashboard/`),
+  coverage: (submissionId: string) =>
+    api.get<{ coverage: CoverageRow[] }>(`/evidence/submissions/${submissionId}/coverage/`),
+  questionDetail: (questionId: string) =>
+    api.get<EvidenceQuestionDetail>(`/evidence/questions/${questionId}/detail/`),
+  createFlag: (data: {
+    viva_session: string
+    viva_question?: string
+    answer?: string
+    flag_type: string
+    severity?: string
+    description: string
+    supporting_evidence?: unknown[]
+    confidence?: string
+  }) => api.post<EvidenceFlag>('/evidence/flags/', data),
+  resolveFlag: (flagId: string, data: { status: string; resolution_note?: string }) =>
+    api.post<EvidenceFlag>(`/evidence/flags/${flagId}/resolve/`, data),
 }
 
 export const studentsApi = {

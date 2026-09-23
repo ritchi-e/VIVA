@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from audit.models import AuditLog
+from common.request_context import get_request_id
 
 
 def log_audit(
@@ -16,6 +17,8 @@ def log_audit(
 ) -> AuditLog:
     ip_address = None
     user_agent = ""
+    meta = dict(metadata or {})
+    request_id = get_request_id()
     if request is not None:
         xff = request.META.get("HTTP_X_FORWARDED_FOR")
         if xff:
@@ -23,6 +26,9 @@ def log_audit(
         else:
             ip_address = request.META.get("REMOTE_ADDR")
         user_agent = request.META.get("HTTP_USER_AGENT", "")[:2000]
+        request_id = request_id or getattr(request, "request_id", None)
+    if request_id:
+        meta.setdefault("request_id", request_id)
 
     return AuditLog.objects.create(
         organization=org,
@@ -32,5 +38,5 @@ def log_audit(
         resource_id=str(resource_id) if resource_id is not None else "",
         ip_address=ip_address,
         user_agent=user_agent,
-        metadata=metadata or {},
+        metadata=meta,
     )

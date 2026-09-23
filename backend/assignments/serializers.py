@@ -19,7 +19,6 @@ class AssignmentSerializer(serializers.ModelSerializer):
             "id",
             "course",
             "title",
-            "description",
             "instructions",
             "status",
             "due_at",

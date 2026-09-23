@@ -8,8 +8,12 @@ from submissions.adapters.base import BaseSubmissionAdapter, ExtractedDocument
 from submissions.text_sanitize import sanitize_json, sanitize_text
 
 
+EXTRACTOR_VERSION = "docx-v1"
+
+
 class DocxAdapter(BaseSubmissionAdapter):
     file_type = "docx"
+    extractor_version = EXTRACTOR_VERSION
 
     def extract(self, data: bytes, filename: str) -> ExtractedDocument:
         doc = Document(BytesIO(data))

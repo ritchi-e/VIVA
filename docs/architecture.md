@@ -81,7 +81,21 @@ Orchestrator persists `VivaSession.state`, `understanding_state`, `coverage_stat
 
 ### 4.3 Assessment HITL
 
-AI generates `Assessment` in `draft` / `pending_review` → instructor inspects evidence → `AssessmentModification` records changes → `finalized` only after instructor action.
+AI generates `Assessment` in `draft` / `pending_review` → instructor inspects evidence → `AssessmentModification` records changes (including per-question review actions) → `finalized` only after instructor action. Evaluation evidence refs are materialized into `AssessmentEvidence` at generation time.
+
+### 4.4 Evidence, provenance & auditability (Phase 1)
+
+Cross-cutting instructor evidence surface built by **activating** existing provenance models rather than duplicating them:
+
+- Structure-aware `SubmissionChunk` location fields (page/slide/inner path)
+- Promoted question/answer/evaluation provenance columns
+- Superseding `AnswerEvaluation` history (`OneToOne` → `FK` + `is_current`/`version`)
+- New lightweight `evidence` app: `EvidenceFlag` + dashboard/drill-down/coverage read APIs
+- Frontend Evidence Dashboard at `/submissions/:id/evidence`
+
+Design details: [evidence-system-design.md](evidence-system-design.md). Audit inventory: [evidence-system-audit.md](evidence-system-audit.md).
+
+**Phase 2 known limitations (deferred):** automated contradiction detection, exportable evidence/appeal package, rendered source highlighting (PDF/DOCX/PPTX/code), `AIUsage`/`AIModel` rollups, rich WebSocket provenance in the live student viva UI.
 
 ## 5. AI architecture
 
@@ -114,7 +128,7 @@ Retrieval over `SubmissionChunk` (+ assignment/rubric text) using pgvector simil
 
 ## 7. Frontend
 
-SPA with React Router. Instructor and student route trees under `/` and `/student/*`. API client uses `VITE_API_URL`; WebSocket uses `VITE_WS_URL`. No Next.js server components.
+SPA with React Router. Instructor and student route trees under `/` and `/student/*`. Instructor evidence dashboard lives at `/submissions/:id/evidence`. API client uses `VITE_API_URL`; WebSocket uses `VITE_WS_URL`. No Next.js server components.
 
 ## 8. Observability
 

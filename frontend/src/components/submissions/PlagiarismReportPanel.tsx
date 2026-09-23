@@ -79,7 +79,7 @@ export function PlagiarismReportPanel({ report }: { report: PlagiarismReport }) 
                       to={`/submissions/${match.submission_id}`}
                       className="text-xs text-blue-700 hover:underline"
                     >
-                      View submission
+                      Open peer review
                     </Link>
                   </div>
                 </div>

@@ -29,7 +29,7 @@ export function VivaSessionDetailPage() {
         description={`${s.student_name || s.student_email} · ${s.state} · ${s.mode}`}
         actions={
           <Link to={`/submissions/${s.submission}`} className="mk-link text-sm">
-            View submission
+            Open review
           </Link>
         }
       />

@@ -183,7 +183,6 @@ class Command(BaseCommand):
                 course=course,
                 title=f"{title} Capstone",
                 defaults={
-                    "description": f"Capstone assessment for {title}",
                     "instructions": instructions,
                     "status": Assignment.Status.PUBLISHED,
                     "created_by": instructor,

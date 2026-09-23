@@ -15,6 +15,12 @@ RBAC roles: `organization_admin`, `instructor`, `student`, `viewer`. Enforced in
 
 Server-side queryset filtering by organization ([ADR-011](adr/ADR-011-multi-tenancy-strategy.md)). RAG queries must include tenant predicates in SQL.
 
+Evidence APIs (`/api/evidence/*`) and assessment question-review are org-scoped via `TenantContextMixin`; objects outside the active organization resolve as 404.
+
+## WebSocket tenancy
+
+`VivaSessionConsumer` requires the connecting user to be authenticated, either the session student (or superuser), **and** an active member of the session assignment's organization. Membership is checked on connect before the channel is accepted.
+
 ## Data protection
 
 - Secrets in environment variables only; `.env` gitignored
@@ -35,4 +41,4 @@ Server-side queryset filtering by organization ([ADR-011](adr/ADR-011-multi-tena
 
 ## Audit
 
-`AuditLog` for admin actions, assessment finalization, permission changes (expanded in Phase 10).
+`AuditLog` for admin actions, assessment finalization, permission changes, and Evidence Phase 1 events (`evidence.flag.created`, `evidence.flag.resolved`, `assessment.question_review`, etc.). `log_audit()` automatically attaches `request_id` from request-context middleware.

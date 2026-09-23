@@ -5,11 +5,14 @@ import uuid
 
 from django.utils.deprecation import MiddlewareMixin
 
+from common.request_context import set_request_id
+
 
 class RequestLoggingMiddleware(MiddlewareMixin):
     def process_request(self, request):
         request.request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
         request._start_time = time.monotonic()
+        set_request_id(request.request_id)
 
     def process_response(self, request, response):
         duration_ms = int((time.monotonic() - getattr(request, "_start_time", time.monotonic())) * 1000)
@@ -25,4 +28,9 @@ class RequestLoggingMiddleware(MiddlewareMixin):
                 "user_id": getattr(getattr(request, "user", None), "id", None),
             },
         )
+        set_request_id(None)
         return response
+
+    def process_exception(self, request, exception):
+        set_request_id(None)
+        return None

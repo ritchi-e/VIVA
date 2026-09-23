@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "assessments",
     "ai",
     "audit",
+    "evidence",
 ]
 
 MIDDLEWARE = [

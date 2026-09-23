@@ -78,6 +78,7 @@ class SubmissionFile(UUIDModel, SoftDeleteModel):
     checksum = models.CharField(max_length=128, blank=True)
     extracted_text = models.TextField(blank=True)
     structure = models.JSONField(default=dict, blank=True)
+    extractor_version = models.CharField(max_length=64, blank=True)
 
 
 class RepositorySnapshot(UUIDModel, SoftDeleteModel):
@@ -237,6 +238,12 @@ class SubmissionChunk(UUIDModel, SoftDeleteModel):
     end_line = models.PositiveIntegerField(null=True, blank=True)
     content_hash = models.CharField(max_length=64, blank=True, db_index=True)
     chunk_kind = models.CharField(max_length=32, choices=ChunkKind.choices, default=ChunkKind.FALLBACK)
+    page_number = models.PositiveIntegerField(null=True, blank=True)
+    section_heading = models.CharField(max_length=255, blank=True)
+    slide_number = models.PositiveIntegerField(null=True, blank=True)
+    inner_path = models.CharField(max_length=500, blank=True)
+    start_offset = models.PositiveIntegerField(null=True, blank=True)
+    end_offset = models.PositiveIntegerField(null=True, blank=True)
     # JSON fallback for SQLite tests; pgvector column is maintained separately on Postgres.
     embedding = models.JSONField(null=True, blank=True)
 

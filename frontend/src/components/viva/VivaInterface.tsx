@@ -91,6 +91,7 @@ export function VivaInterface({
   const [awaySeconds, setAwaySeconds] = useState<number | null>(null)
   const [selectedVoice, setSelectedVoice] = useState<ExaminerVoiceChoice>('siya')
   const [previewingVoice, setPreviewingVoice] = useState<ExaminerVoiceChoice | null>(null)
+  const [prepAck, setPrepAck] = useState(false)
   const selectedVoiceRef = useRef<ExaminerVoiceChoice>('siya')
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -729,7 +730,7 @@ export function VivaInterface({
   const statusDetail = finishing
     ? PLATFORM_PROGRESS.finishingViva.detail
     : showBeginButton
-      ? 'Choose a voice, then begin. Stay in this window — leaving for more than 5 seconds ends the session. Camera access is required.'
+      ? 'Choose a voice, confirm the monitoring rules, then start. Stay in this window — leaving for more than 5 seconds ends the session. Camera access is required.'
       : rotating ?? copy.detail
 
   const preventCopy = useCallback((event: ClipboardEvent | MouseEvent | DragEvent) => {
@@ -796,7 +797,14 @@ export function VivaInterface({
           <span>{progress}%</span>
         </div>
 
-        <div className="mb-5 w-full max-w-xl sm:mb-8">
+        <div
+          className="mb-5 w-full max-w-xl sm:mb-8"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progress}
+          aria-label="Viva progress"
+        >
           <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
             <div
               className="h-full rounded-full bg-gradient-to-r from-teal-400 via-cyan-400 to-emerald-400 transition-all duration-700"
@@ -807,7 +815,13 @@ export function VivaInterface({
 
         <VivaOrb phase={activePhase} />
 
-        <div className="mt-4 max-w-lg px-1 text-center animate-viva-fade-up sm:mt-7" key={statusTitle}>
+        <div
+          className="mt-4 max-w-lg px-1 text-center animate-viva-fade-up sm:mt-7"
+          key={statusTitle}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           <p className="font-display text-lg font-semibold tracking-tight text-white sm:text-2xl">
             {statusTitle}
           </p>
@@ -816,21 +830,34 @@ export function VivaInterface({
               {statusDetail}
             </p>
           ) : null}
+          {phase === 'listening' ? (
+            <p className="mt-2 text-sm font-semibold text-teal-200/90">Listening… speak clearly</p>
+          ) : null}
+          {phase === 'processing' ? (
+            <p className="mt-2 text-sm font-semibold text-cyan-200/90">Considering your answer…</p>
+          ) : null}
         </div>
 
         {showBeginButton ? (
-          <div className="mt-5 flex w-full max-w-lg flex-col items-stretch gap-4 animate-viva-fade-up sm:mt-10 sm:gap-5">
+          <div className="mt-5 flex w-full max-w-lg flex-col items-stretch gap-4 animate-viva-fade-up sm:mt-8 sm:gap-5">
+            <div className="rounded-2xl border border-amber-200/25 bg-amber-500/10 px-4 py-3 text-left text-xs leading-relaxed text-amber-50/90 sm:text-sm">
+              This viva is live-monitored. Stay in this window. Leaving for more than 5 seconds ends
+              the session and notifies your instructor. Camera access is required. Estimated time:
+              about {Math.max(5, Math.round((questionBudget || 6) * 1.5))}–{Math.max(10, Math.round((questionBudget || 6) * 2.5))} minutes · about {questionBudget} questions.
+            </div>
             <div>
               <p className="mb-3 text-center text-xs font-medium uppercase tracking-[0.14em] text-white/45">
                 Examiner voice
               </p>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Examiner voice">
                 {EXAMINER_VOICE_OPTIONS.map((option) => {
                   const active = selectedVoice === option.id
                   return (
                     <button
                       key={option.id}
                       type="button"
+                      role="radio"
+                      aria-checked={active}
                       onClick={() => {
                         setSelectedVoice(option.id)
                         selectedVoiceRef.current = option.id
@@ -869,16 +896,24 @@ export function VivaInterface({
                 {previewingVoice === selectedVoice ? 'Playing a short sample…' : 'Preview voice'}
               </button>
             </div>
-            <div className="hidden rounded-2xl border border-amber-200/20 bg-amber-500/10 px-4 py-3 text-left text-xs leading-relaxed text-amber-50/85 sm:block">
-              This viva is live-monitored. Stay in this window. If you leave for more than 5 seconds,
-              the session ends and your instructor is notified. Camera access is required.
-            </div>
+            <label className="flex items-start gap-2 text-left text-xs text-white/70">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={prepAck}
+                onChange={(e) => setPrepAck(e.target.checked)}
+              />
+              <span>
+                I understand the camera is required and leaving this window can end the viva.
+              </span>
+            </label>
             <button
               type="button"
+              disabled={!prepAck}
               onClick={() => void beginSession()}
-              className="rounded-full bg-gradient-to-r from-teal-500 to-cyan-600 px-8 py-3.5 font-display text-sm font-semibold text-white shadow-[0_12px_40px_rgba(20,184,166,0.35)] transition hover:brightness-110"
+              className="rounded-full bg-gradient-to-r from-teal-500 to-cyan-600 px-8 py-3.5 font-display text-sm font-semibold text-white shadow-[0_12px_40px_rgba(20,184,166,0.35)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Begin viva
+              Start viva
             </button>
           </div>
         ) : null}
@@ -941,7 +976,37 @@ export function VivaInterface({
         ) : null}
 
         {error ? (
-          <p className="mt-6 max-w-md text-center text-sm text-rose-300">{error}</p>
+          <div
+            className="mt-6 max-w-md rounded-2xl border border-rose-300/30 bg-rose-500/10 px-4 py-4 text-center"
+            role="alert"
+            aria-live="assertive"
+          >
+            <p className="text-sm font-semibold text-rose-100">Connection interrupted</p>
+            <p className="mt-2 text-sm text-rose-100/80">{error}</p>
+            <p className="mt-2 text-xs text-rose-100/60">Your previous answers are saved.</p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null)
+                  if (phase === 'error') setPhase(audioStarted ? 'preparing' : 'connecting')
+                  connect()
+                }}
+                className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold text-white hover:bg-white/15"
+              >
+                Reconnect
+              </button>
+              {audioStarted ? (
+                <button
+                  type="button"
+                  onClick={() => void finishViva()}
+                  className="rounded-full border border-white/15 px-4 py-2 text-xs font-medium text-white/70 hover:bg-white/10"
+                >
+                  End viva
+                </button>
+              ) : null}
+            </div>
+          </div>
         ) : null}
 
         {!micSupported && phase !== 'complete' ? (

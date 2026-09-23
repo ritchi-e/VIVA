@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Iterable
 
+from django.utils.html import strip_tags
+
 from ai.service import AIService
 from submissions.models import Submission, SubmissionFile
 
@@ -26,8 +28,7 @@ def _assignment_brief(submission: Submission) -> str:
     assignment = submission.assignment
     parts = [
         assignment.title or "",
-        assignment.description or "",
-        assignment.instructions or "",
+        strip_tags(assignment.instructions or ""),
     ]
     return "\n".join(part.strip() for part in parts if part and part.strip())
 

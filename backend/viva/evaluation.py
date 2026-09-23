@@ -22,6 +22,14 @@ EVAL_SCHEMA = {
         "requires_follow_up": {"type": "boolean"},
         "explanation": {"type": "string"},
         "evidence_refs": {"type": "array", "items": {"type": "string"}},
+        "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low", "insufficient_evidence"],
+        },
+        "evidence_quality": {
+            "type": "string",
+            "enum": ["direct", "derived", "stated", "external"],
+        },
     },
     "required": [
         "conceptual_accuracy",
@@ -94,25 +102,75 @@ def _validate_evidence_refs(refs: list, submission_id) -> list[str]:
     return [r for r in str_refs if r in {str(v) for v in valid_ids}]
 
 
+def _infer_confidence(data: dict) -> str:
+    overall = _clamp(data.get("overall", 0))
+    evidence = _clamp(data.get("evidence_support", 0))
+    if overall < 3 or evidence < 2:
+        return AnswerEvaluation.Confidence.INSUFFICIENT_EVIDENCE
+    if overall >= 8 and evidence >= 7:
+        return AnswerEvaluation.Confidence.HIGH
+    if overall >= 5:
+        return AnswerEvaluation.Confidence.MEDIUM
+    return AnswerEvaluation.Confidence.LOW
+
+
+def _infer_evidence_quality(data: dict, validated_refs: list[str]) -> str:
+    if validated_refs:
+        return AnswerEvaluation.EvidenceQuality.DIRECT
+    overall = _clamp(data.get("overall", 0))
+    if overall < 3:
+        return AnswerEvaluation.EvidenceQuality.STATED
+    return AnswerEvaluation.EvidenceQuality.DERIVED
+
+
+def _scores_equal(existing: AnswerEvaluation, data: dict, validated_refs: list[str]) -> bool:
+    return (
+        abs(existing.conceptual_accuracy - _clamp(data.get("conceptual_accuracy", 0))) < 0.01
+        and abs(existing.evidence_support - _clamp(data.get("evidence_support", 0))) < 0.01
+        and abs(existing.depth - _clamp(data.get("depth", 0))) < 0.01
+        and abs(existing.relevance - _clamp(data.get("relevance", 0))) < 0.01
+        and abs(existing.overall - _clamp(data.get("overall", 0))) < 0.01
+        and bool(existing.requires_follow_up) == bool(data.get("requires_follow_up", False))
+        and (existing.explanation or "") == str(data.get("explanation", "")).strip()
+        and list(existing.evidence_refs or []) == list(validated_refs)
+    )
+
+
 def _save_evaluation(answer: StudentAnswer, data: dict, submission_id=None) -> AnswerEvaluation:
+    from django.utils import timezone
+
     raw_refs = data.get("evidence_refs", []) if isinstance(data.get("evidence_refs"), list) else []
     validated_refs = _validate_evidence_refs(raw_refs, submission_id) if submission_id else raw_refs
-    evaluation, _created = AnswerEvaluation.objects.update_or_create(
+    confidence = str(data.get("confidence") or _infer_confidence(data)).strip()
+    evidence_quality = str(data.get("evidence_quality") or _infer_evidence_quality(data, validated_refs)).strip()
+
+    current = answer.current_evaluation
+    if current and _scores_equal(current, data, validated_refs):
+        return current
+
+    next_version = (current.version + 1) if current else 1
+    if current:
+        current.is_current = False
+        current.superseded_at = timezone.now()
+        current.save(update_fields=["is_current", "superseded_at", "updated_at"])
+
+    return AnswerEvaluation.objects.create(
         answer=answer,
-        defaults={
-            "conceptual_accuracy": _clamp(data.get("conceptual_accuracy", 0)),
-            "evidence_support": _clamp(data.get("evidence_support", 0)),
-            "depth": _clamp(data.get("depth", 0)),
-            "relevance": _clamp(data.get("relevance", 0)),
-            "overall": _clamp(data.get("overall", 0)),
-            "requires_follow_up": bool(data.get("requires_follow_up", False)),
-            "explanation": str(data.get("explanation", "")).strip(),
-            "evidence_refs": validated_refs,
-            "raw": data,
-            "is_ai_generated": True,
-        },
+        conceptual_accuracy=_clamp(data.get("conceptual_accuracy", 0)),
+        evidence_support=_clamp(data.get("evidence_support", 0)),
+        depth=_clamp(data.get("depth", 0)),
+        relevance=_clamp(data.get("relevance", 0)),
+        overall=_clamp(data.get("overall", 0)),
+        requires_follow_up=bool(data.get("requires_follow_up", False)),
+        explanation=str(data.get("explanation", "")).strip(),
+        evidence_refs=validated_refs,
+        raw=data,
+        is_ai_generated=True,
+        confidence=confidence,
+        evidence_quality=evidence_quality,
+        version=next_version,
+        is_current=True,
     )
-    return evaluation
 
 
 def evaluate_answer(answer: StudentAnswer, organization: Organization) -> AnswerEvaluation:

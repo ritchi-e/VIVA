@@ -15,5 +15,6 @@ urlpatterns = [
     path("api/assessments/", include("assessments.urls")),
     path("api/ai/", include("ai.urls")),
     path("api/audit/", include("audit.urls")),
+    path("api/evidence/", include("evidence.urls")),
     path("metrics", exports.ExportToDjangoView, name="prometheus-django-metrics"),
 ]

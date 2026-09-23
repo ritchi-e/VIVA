@@ -26,6 +26,12 @@ class VivaSessionConsumer(AsyncJsonWebsocketConsumer):
         if str(self.session.student_id) != str(user.id) and not user.is_superuser:
             await self.close()
             return
+        # Tenant isolation: user must belong to the session's organization.
+        if not user.is_superuser:
+            allowed = await self._user_in_session_org(user.id, self.session.assignment.course.organization_id)
+            if not allowed:
+                await self.close()
+                return
         self.group_name = f"viva_{self.session_id}"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
@@ -142,6 +148,16 @@ class VivaSessionConsumer(AsyncJsonWebsocketConsumer):
             )
         except VivaSession.DoesNotExist:
             return None
+
+    @database_sync_to_async
+    def _user_in_session_org(self, user_id, organization_id) -> bool:
+        from orgs.models import Membership
+
+        return Membership.objects.filter(
+            user_id=user_id,
+            organization_id=organization_id,
+            is_active=True,
+        ).exists()
 
     @database_sync_to_async
     def _current_open_question(self):

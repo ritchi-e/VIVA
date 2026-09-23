@@ -163,6 +163,9 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
             ser.validated_data["question_id"],
             ser.validated_data["text"],
             input_mode=ser.validated_data.get("input_mode", "text"),
+            audio_storage_key=ser.validated_data.get("audio_storage_key") or "",
+            metadata=ser.validated_data.get("metadata") or {},
+            duration_seconds=ser.validated_data.get("duration_seconds"),
         )
         session.refresh_from_db()
         return Response({**result, "session": VivaSessionSerializer(session).data})
@@ -180,7 +183,7 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
         session = self.get_object()
         from viva.serializers import VivaQuestionSerializer
 
-        qs = session.questions.prefetch_related("attempts__answers__evaluation").order_by("sequence")
+        qs = session.questions.prefetch_related("attempts__answers__evaluations").order_by("sequence")
         return Response(VivaQuestionSerializer(qs, many=True).data)
 
     @action(detail=True, methods=["get"], url_path="stt-config")
@@ -242,8 +245,27 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
 
         keyterms = keyterms_for_session(session)
         try:
+            import time as _time
+
+            start = _time.monotonic()
             provider = get_stt_provider()
             text = provider.transcribe(audio_bytes, content_type, keyterms=keyterms)
+            latency_ms = int((_time.monotonic() - start) * 1000)
+            from ai.service import AIService
+
+            AIService(
+                organization=session.assignment.course.organization,
+                user=request.user,
+                viva_session=session,
+                submission=session.submission,
+            ).log_external(
+                provider=provider.__class__.__name__,
+                model=getattr(provider, "model", "stt"),
+                request_type="stt",
+                latency_ms=latency_ms,
+                success=True,
+                metadata={"keyterms_used": len(keyterms), "content_type": content_type},
+            )
         except Exception as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
@@ -252,6 +274,11 @@ class VivaSessionViewSet(TenantContextMixin, viewsets.ModelViewSet):
                 "text": (text or "").strip(),
                 "keyterms_used": len(keyterms),
                 "provider": provider.__class__.__name__,
+                "asr": {
+                    "provider": provider.__class__.__name__,
+                    "model": getattr(provider, "model", ""),
+                    "content_type": content_type,
+                },
             }
         )
 

@@ -5,11 +5,9 @@ import {
   BookOpen,
   ClipboardList,
   FileText,
-  GraduationCap,
   LayoutDashboard,
   LogOut,
   Menu,
-  Mic,
   Settings,
   Shield,
   Users,
@@ -26,10 +24,8 @@ const instructorNav: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/courses', label: 'Courses', icon: BookOpen },
   { to: '/assignments', label: 'Assignments', icon: ClipboardList },
-  { to: '/submissions', label: 'Submissions', icon: FileText },
-  { to: '/viva-sessions', label: 'Viva sessions', icon: Mic },
+  { to: '/submissions', label: 'Review', icon: FileText },
   { to: '/students', label: 'Students', icon: Users },
-  { to: '/reports', label: 'Reports', icon: GraduationCap },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 

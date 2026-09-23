@@ -32,6 +32,27 @@ class AIRequest(UUIDModel, SoftDeleteModel):
         blank=True,
         related_name="ai_requests",
     )
+    viva_session = models.ForeignKey(
+        "viva.VivaSession",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ai_requests",
+    )
+    viva_question = models.ForeignKey(
+        "viva.VivaQuestion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ai_requests",
+    )
+    submission = models.ForeignKey(
+        "submissions.Submission",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ai_requests",
+    )
     input_tokens = models.PositiveIntegerField(default=0)
     output_tokens = models.PositiveIntegerField(default=0)
     estimated_cost_usd = models.DecimalField(max_digits=10, decimal_places=6, default=0)

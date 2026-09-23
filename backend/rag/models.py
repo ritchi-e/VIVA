@@ -58,6 +58,13 @@ class RetrievalLog(UUIDModel, SoftDeleteModel):
         null=True,
         blank=True,
     )
+    viva_question = models.ForeignKey(
+        "viva.VivaQuestion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="retrieval_logs",
+    )
     query = models.TextField()
     results = models.JSONField(default=list, blank=True)
     filters = models.JSONField(default=dict, blank=True)

@@ -1,18 +1,6 @@
-import { useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import {
-  Award,
-  BookOpen,
-  ClipboardList,
-  Home,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  Plus,
-  Settings,
-  Shield,
-  X,
-} from 'lucide-react'
+import { Home, LogOut, Menu, Plus, Settings, Shield, UserPlus, X } from 'lucide-react'
 import { LogoMark } from '@/components/brand/Logo'
 import wordmarkUrl from '@/assets/mokhik-wordmark.png'
 import { useAuth } from '@/context/AuthContext'
@@ -20,15 +8,6 @@ import { coursesApi } from '@/lib/api'
 import { useAsync } from '@/hooks/useAsync'
 import { cn } from '@/lib/utils'
 import type { Course } from '@/types'
-
-type NavItem = { to: string; label: string; icon: ComponentType<{ className?: string }> }
-
-const studentNav: NavItem[] = [
-  { to: '/student/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/student/assignments', label: 'Assignments', icon: ClipboardList },
-  { to: '/student/join', label: 'Join course', icon: BookOpen },
-  { to: '/student/results', label: 'Results', icon: Award },
-]
 
 function SidebarBrand() {
   return (
@@ -41,10 +20,11 @@ function SidebarBrand() {
   )
 }
 
-function HomeNavLink({ onNavigate }: { onNavigate?: () => void }) {
+function HomeNavLink({ to, onNavigate }: { to: string; onNavigate?: () => void }) {
   return (
     <NavLink
-      to="/dashboard"
+      to={to}
+      end
       onClick={onNavigate}
       className={({ isActive }) =>
         cn(
@@ -74,10 +54,12 @@ function HomeNavLink({ onNavigate }: { onNavigate?: () => void }) {
 function CourseNavList({
   courses,
   activeCourseId,
+  basePath,
   onNavigate,
 }: {
   courses: Course[]
   activeCourseId?: string
+  basePath: string
   onNavigate?: () => void
 }) {
   return (
@@ -87,7 +69,7 @@ function CourseNavList({
         return (
           <NavLink
             key={course.id}
-            to={`/courses/${course.id}`}
+            to={`${basePath}/${course.id}`}
             onClick={onNavigate}
             title={`${course.code} — ${course.title}`}
             className={cn(
@@ -121,50 +103,29 @@ function CourseNavList({
   )
 }
 
-function StudentNavItems({
-  items,
-  onNavigate,
-}: {
-  items: NavItem[]
-  onNavigate?: () => void
-}) {
+function SignOutButton({ onNavigate }: { onNavigate?: () => void }) {
+  const navigate = useNavigate()
+  const { logout } = useAuth()
   return (
-    <nav className="space-y-1">
-      {items.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(
-              'group relative flex items-center gap-3 rounded-[var(--radius-control)] px-3 py-3 text-[15px] font-semibold transition duration-150',
-              isActive
-                ? 'bg-[var(--color-sidebar-active)] text-[var(--color-primary)]'
-                : 'text-[var(--color-muted)] hover:bg-slate-50 hover:text-[var(--color-foreground)]',
-            )
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <span
-                className={cn(
-                  'absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-[var(--color-accent)] transition',
-                  isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-40',
-                )}
-              />
-              <item.icon className="h-5 w-5 shrink-0 opacity-90" />
-              {item.label}
-            </>
-          )}
-        </NavLink>
-      ))}
-    </nav>
+    <div className="border-t border-[var(--color-border)] p-3">
+      <button
+        type="button"
+        className="flex w-full items-center gap-3 rounded-[var(--radius-control)] px-3 py-3 text-[15px] font-semibold text-[var(--color-muted)] transition hover:bg-slate-50 hover:text-[var(--color-foreground)]"
+        onClick={() => {
+          onNavigate?.()
+          logout()
+          navigate('/login')
+        }}
+      >
+        <LogOut className="h-5 w-5 shrink-0" />
+        Sign out
+      </button>
+    </div>
   )
 }
 
 function InstructorSidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const navigate = useNavigate()
-  const { logout, isOrgAdmin, activeMembership } = useAuth()
+  const { isOrgAdmin, activeMembership } = useAuth()
   const location = useLocation()
   const courses = useAsync(
     () => coursesApi.list(),
@@ -184,7 +145,7 @@ function InstructorSidebar({ onNavigate }: { onNavigate?: () => void }) {
         <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
           Workspace
         </p>
-        <HomeNavLink onNavigate={onNavigate} />
+        <HomeNavLink to="/dashboard" onNavigate={onNavigate} />
 
         <div className="mt-5 mb-2 flex items-center justify-between px-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
@@ -220,6 +181,7 @@ function InstructorSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <CourseNavList
             courses={courses.data}
             activeCourseId={activeCourseId}
+            basePath="/courses"
             onNavigate={onNavigate}
           />
         ) : null}
@@ -262,33 +224,24 @@ function InstructorSidebar({ onNavigate }: { onNavigate?: () => void }) {
           ) : null}
         </div>
       </div>
-      <div className="border-t border-[var(--color-border)] p-3">
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-[var(--radius-control)] px-3 py-3 text-[15px] font-semibold text-[var(--color-muted)] transition hover:bg-slate-50 hover:text-[var(--color-foreground)]"
-          onClick={() => {
-            onNavigate?.()
-            logout()
-            navigate('/login')
-          }}
-        >
-          <LogOut className="h-5 w-5 shrink-0" />
-          Sign out
-        </button>
-      </div>
+      <SignOutButton onNavigate={onNavigate} />
     </div>
   )
 }
 
-function StudentSidebar({
-  nav,
-  onNavigate,
-}: {
-  nav: NavItem[]
-  onNavigate?: () => void
-}) {
-  const navigate = useNavigate()
-  const { logout } = useAuth()
+function StudentSidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const { activeMembership } = useAuth()
+  const location = useLocation()
+  const courses = useAsync(
+    () => coursesApi.list(),
+    [activeMembership?.organization ?? '', location.pathname.includes('/join') ? 'join' : 'list'],
+  )
+
+  const pathParts = location.pathname.split('/')
+  const activeCourseId =
+    pathParts[1] === 'student' && pathParts[2] === 'courses' && pathParts[3]
+      ? pathParts[3]
+      : undefined
 
   return (
     <div className="flex h-full flex-col">
@@ -297,22 +250,57 @@ function StudentSidebar({
         <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
           Workspace
         </p>
-        <StudentNavItems items={nav} onNavigate={onNavigate} />
+        <HomeNavLink to="/student/dashboard" onNavigate={onNavigate} />
+
+        <div className="mt-5 mb-2 flex items-center justify-between px-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            Classes
+          </p>
+          <Link
+            to="/student/join"
+            onClick={onNavigate}
+            className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-[var(--color-primary)]"
+            aria-label="Join course"
+            title="Join course"
+          >
+            <UserPlus className="h-4 w-4" />
+          </Link>
+        </div>
+
+        {courses.loading ? (
+          <p className="px-3 py-2 text-sm text-[var(--color-muted)]">Loading…</p>
+        ) : null}
+        {courses.error ? (
+          <button
+            type="button"
+            className="px-3 py-2 text-left text-sm text-[var(--color-danger)]"
+            onClick={() => void courses.reload()}
+          >
+            Couldn’t load classes. Retry
+          </button>
+        ) : null}
+        {!courses.loading && !courses.error && (courses.data?.length ?? 0) === 0 ? (
+          <div className="px-3 py-2">
+            <p className="text-sm text-[var(--color-muted)]">No classes yet</p>
+            <Link
+              to="/student/join"
+              onClick={onNavigate}
+              className="mt-2 inline-flex text-sm font-semibold text-[var(--color-primary)] hover:underline"
+            >
+              Join a course
+            </Link>
+          </div>
+        ) : null}
+        {courses.data ? (
+          <CourseNavList
+            courses={courses.data}
+            activeCourseId={activeCourseId}
+            basePath="/student/courses"
+            onNavigate={onNavigate}
+          />
+        ) : null}
       </div>
-      <div className="border-t border-[var(--color-border)] p-3">
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-[var(--radius-control)] px-3 py-3 text-[15px] font-semibold text-[var(--color-muted)] transition hover:bg-slate-50 hover:text-[var(--color-foreground)]"
-          onClick={() => {
-            onNavigate?.()
-            logout()
-            navigate('/login')
-          }}
-        >
-          <LogOut className="h-5 w-5 shrink-0" />
-          Sign out
-        </button>
-      </div>
+      <SignOutButton onNavigate={onNavigate} />
     </div>
   )
 }
@@ -346,11 +334,7 @@ export function AppShell({ variant }: { variant: 'instructor' | 'student' }) {
           }}
         />
         <div className="relative flex h-full flex-col">
-          {variant === 'instructor' ? (
-            <InstructorSidebar />
-          ) : (
-            <StudentSidebar nav={studentNav} />
-          )}
+          {variant === 'instructor' ? <InstructorSidebar /> : <StudentSidebar />}
         </div>
       </aside>
 
@@ -374,7 +358,7 @@ export function AppShell({ variant }: { variant: 'instructor' | 'student' }) {
             {variant === 'instructor' ? (
               <InstructorSidebar onNavigate={() => setMobileOpen(false)} />
             ) : (
-              <StudentSidebar nav={studentNav} onNavigate={() => setMobileOpen(false)} />
+              <StudentSidebar onNavigate={() => setMobileOpen(false)} />
             )}
           </aside>
         </div>

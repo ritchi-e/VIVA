@@ -3,6 +3,7 @@ import { assessmentsApi, submissionsApi } from '@/lib/api'
 import { useAsync } from '@/hooks/useAsync'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
 import { ProgressPanel } from '@/components/ui/Spinner'
 import { PLATFORM_PROGRESS } from '@/lib/progressCopy'
 import { ErrorState } from '@/components/layout/StateViews'
@@ -27,6 +28,11 @@ export function StudentResultsPage() {
 
   if (loading) return <ProgressPanel copy={PLATFORM_PROGRESS.results} />
   if (error) return <ErrorState message={error} onRetry={reload} />
+
+  const backToAssignment = data?.submission?.assignment
+    ? `/student/assignments/${data.submission.assignment}`
+    : '/student/dashboard'
+
   if (!data?.assessment) {
     return (
       <div>
@@ -34,15 +40,11 @@ export function StudentResultsPage() {
         <Card>
           <CardBody className="space-y-3 text-sm text-slate-700">
             <p>Your viva is complete, but the score is not ready yet. This usually finishes within a minute.</p>
-            <button
-              type="button"
-              onClick={reload}
-              className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
+            <Button variant="secondary" onClick={reload}>
               Refresh
-            </button>
-            <Link to="/student/results" className="mk-link inline-block">
-              Back to results
+            </Button>
+            <Link to={backToAssignment} className="mk-link inline-block">
+              Back to assignment
             </Link>
           </CardBody>
         </Card>
@@ -61,8 +63,8 @@ export function StudentResultsPage() {
         title="Viva results"
         description={assessment.assignment_title || 'Your score and submitted work'}
         actions={
-          <Link to="/student/results" className="mk-link text-sm">
-            All results
+          <Link to={backToAssignment} className="mk-link text-sm">
+            Back to assignment
           </Link>
         }
       />

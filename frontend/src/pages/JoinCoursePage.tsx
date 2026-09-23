@@ -31,7 +31,7 @@ export function JoinCoursePage() {
       const { data } = await coursesApi.join(normalized)
       setOrganizationId(data.organization_id)
       await refreshProfile()
-      navigate('/student/dashboard', { replace: true })
+      navigate(`/student/courses/${data.course.id}`, { replace: true })
     } catch (err) {
       setErrorMsg(getApiErrorMessage(err))
     } finally {

@@ -20,6 +20,70 @@ function isOfficeDoc(file: SubmissionFile) {
   )
 }
 
+function OfficeFilePreview({
+  submissionId,
+  file,
+  compact,
+  text,
+}: {
+  submissionId: string
+  file: SubmissionFile
+  compact: boolean
+  text: string
+}) {
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let objectUrl: string | null = null
+    let cancelled = false
+    submissionsApi
+      .fileContent(submissionId, file.id)
+      .then((r) => {
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(r.data)
+        setDownloadUrl(objectUrl)
+      })
+      .catch(() => {
+        if (!cancelled) setError('Could not load this file.')
+      })
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [submissionId, file.id])
+
+  return (
+    <div
+      className={cn(
+        'overflow-y-auto rounded-xl border border-slate-200 bg-white p-5',
+        compact ? 'max-h-[62vh]' : 'max-h-[70vh]',
+      )}
+    >
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium text-slate-700">{file.original_filename}</p>
+        {downloadUrl ? (
+          <a
+            href={downloadUrl}
+            download={file.original_filename}
+            className="text-sm font-semibold text-[var(--color-primary)] hover:underline"
+          >
+            Download
+          </a>
+        ) : null}
+      </div>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {text ? (
+        <pre className="whitespace-pre-wrap font-sans text-sm leading-6 text-slate-800">{text}</pre>
+      ) : (
+        <p className="text-sm text-slate-500">
+          Preview shows extracted text after processing. Use Download to open the original file.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function FilePreview({
   submissionId,
   file,
@@ -70,22 +134,7 @@ function FilePreview({
   if (isOfficeDoc(file)) {
     const text = (file.extracted_text || '').trim()
     return (
-      <div
-        className={cn(
-          'overflow-y-auto rounded-xl border border-slate-200 bg-white p-5',
-          compact ? 'max-h-[62vh]' : 'max-h-[70vh]',
-        )}
-      >
-        <p className="mb-3 text-sm font-medium text-slate-700">{file.original_filename}</p>
-        {text ? (
-          <pre className="whitespace-pre-wrap font-sans text-sm leading-6 text-slate-800">{text}</pre>
-        ) : (
-          <p className="text-sm text-slate-500">
-            Word and PowerPoint files are kept on the platform. A formatted page preview is not available in
-            the browser, so the extracted text will appear here after processing.
-          </p>
-        )}
-      </div>
+      <OfficeFilePreview submissionId={submissionId} file={file} compact={compact} text={text} />
     )
   }
 

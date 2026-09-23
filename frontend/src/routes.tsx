@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { CourseWorkspaceLayout } from '@/components/layout/CourseWorkspaceLayout'
+import { StudentCourseWorkspaceLayout } from '@/components/layout/StudentCourseWorkspaceLayout'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
@@ -24,7 +25,8 @@ import { ReportsPage } from '@/pages/ReportsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { AdminPage } from '@/pages/AdminPage'
 import { StudentDashboardPage } from '@/pages/student/StudentDashboardPage'
-import { StudentAssignmentsPage } from '@/pages/student/StudentAssignmentsPage'
+import { StudentCourseAssignmentsPage } from '@/pages/student/StudentCourseAssignmentsPage'
+import { StudentCourseVivaPage } from '@/pages/student/StudentCourseVivaPage'
 import { StudentAssignmentDetailPage } from '@/pages/student/StudentAssignmentDetailPage'
 import { StudentSubmissionPage } from '@/pages/student/StudentSubmissionPage'
 import { StudentVivaPage } from '@/pages/student/StudentVivaPage'
@@ -76,10 +78,15 @@ export function AppRoutes() {
         <Route element={<AppShell variant="student" />}>
           <Route path="/student/dashboard" element={<StudentDashboardPage />} />
           <Route path="/student/join" element={<JoinCoursePage />} />
-          <Route path="/student/assignments" element={<StudentAssignmentsPage />} />
+          <Route path="/student/courses/:courseId" element={<StudentCourseWorkspaceLayout />}>
+            <Route index element={<StudentCourseAssignmentsPage />} />
+            <Route path="viva" element={<StudentCourseVivaPage />} />
+            <Route path="assignments/:assignmentId" element={<StudentAssignmentDetailPage />} />
+          </Route>
+          <Route path="/student/assignments" element={<Navigate to="/student/dashboard" replace />} />
+          <Route path="/student/assignments/:id/book-slot" element={<StudentSlotBookingPage />} />
           <Route path="/student/assignments/:id" element={<StudentAssignmentDetailPage />} />
           <Route path="/student/submissions/:id" element={<StudentSubmissionPage />} />
-          <Route path="/student/assignments/:id/book-slot" element={<StudentSlotBookingPage />} />
           <Route path="/student/viva/:id" element={<StudentVivaPage />} />
           <Route path="/student/results" element={<StudentResultsListPage />} />
           <Route path="/student/results/:id" element={<StudentResultsPage />} />

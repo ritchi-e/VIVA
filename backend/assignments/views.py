@@ -42,6 +42,9 @@ class AssignmentViewSet(TenantContextMixin, TenantQuerysetMixin, viewsets.ModelV
     def get_queryset(self):
         org_id = self.get_organization_id()
         qs = Assignment.objects.filter(course__organization_id=org_id).select_related("course", "created_by")
+        role = getattr(self.request.user, "active_role", None)
+        if role == "student":
+            qs = qs.filter(course__enrollments__user=self.request.user).distinct()
         return qs.prefetch_related("learning_outcomes")
 
     def perform_create(self, serializer):

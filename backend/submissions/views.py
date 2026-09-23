@@ -35,9 +35,12 @@ class SubmissionViewSet(TenantContextMixin, viewsets.ModelViewSet):
         if role == "student":
             qs = qs.filter(student=self.request.user)
         assignment_id = self.request.query_params.get("assignment")
+        course_id = self.request.query_params.get("course")
         student_id = self.request.query_params.get("student")
         if assignment_id:
             qs = qs.filter(assignment_id=assignment_id)
+        if course_id:
+            qs = qs.filter(assignment__course_id=course_id)
         if student_id:
             qs = qs.filter(student_id=student_id)
 

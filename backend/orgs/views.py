@@ -15,7 +15,7 @@ from assignments.models import Assignment
 from audit.services import log_audit
 from common.permissions import IsOrgAdmin
 from common.tenancy import TenantContextMixin, TenantQuerysetMixin, resolve_tenant_context
-from courses.models import Course
+from courses.models import Course, CourseEnrollment
 from orgs.models import Membership, Organization
 from orgs.serializers import (
     MembershipSerializer,
@@ -23,7 +23,7 @@ from orgs.serializers import (
     OrganizationSerializer,
 )
 from submissions.models import Submission
-from viva.models import VivaSession
+from viva.models import VivaSession, VivaSlotBooking
 
 
 class OrganizationViewSet(TenantContextMixin, viewsets.ModelViewSet):
@@ -296,6 +296,59 @@ class DashboardView(APIView):
                 }
             )
 
+        now = timezone.now()
+        upcoming_qs = list(
+            assignments.filter(
+                status=Assignment.Status.PUBLISHED,
+                due_at__isnull=False,
+                due_at__gte=now - timedelta(days=3),
+                due_at__lte=now + timedelta(days=21),
+            )
+            .select_related("course")
+            .order_by("due_at")[:12]
+        )
+        upcoming_ids = [a.id for a in upcoming_qs]
+        upcoming_course_ids = {a.course_id for a in upcoming_qs}
+
+        students_by_course = {
+            row["course_id"]: row["c"]
+            for row in CourseEnrollment.objects.filter(
+                course_id__in=upcoming_course_ids,
+                role=CourseEnrollment.Role.STUDENT,
+            )
+            .values("course_id")
+            .annotate(c=Count("id"))
+        }
+        submissions_by_assignment = {
+            row["assignment_id"]: row["c"]
+            for row in Submission.objects.filter(assignment_id__in=upcoming_ids)
+            .values("assignment_id")
+            .annotate(c=Count("student", distinct=True))
+        }
+        bookings_by_assignment = {
+            row["assignment_id"]: row["c"]
+            for row in VivaSlotBooking.objects.filter(
+                assignment_id__in=upcoming_ids,
+                status__in=[VivaSlotBooking.Status.BOOKED, VivaSlotBooking.Status.STARTED],
+            )
+            .values("assignment_id")
+            .annotate(c=Count("id"))
+        }
+        upcoming_assignments = [
+            {
+                "id": str(a.id),
+                "title": a.title,
+                "course_id": str(a.course_id),
+                "course_code": a.course.code,
+                "course_title": a.course.title,
+                "due_at": a.due_at.isoformat() if a.due_at else None,
+                "students_assigned": students_by_course.get(a.course_id, 0),
+                "submissions_count": submissions_by_assignment.get(a.id, 0),
+                "booked_slots_count": bookings_by_assignment.get(a.id, 0),
+            }
+            for a in upcoming_qs
+        ]
+
         return Response(
             {
                 "courses_count": Course.objects.filter(organization_id=org_id).count(),
@@ -323,6 +376,7 @@ class DashboardView(APIView):
                 "assessment_distribution": list(distribution),
                 "students_requiring_review": pending_review,
                 "recent_sessions": [_serialize_recent_session(s) for s in recent_sessions_qs],
+                "upcoming_assignments": upcoming_assignments,
                 "sessions_by_day": completions_series,
                 "scores_by_week": weekly_scores,
                 "score_buckets": buckets,

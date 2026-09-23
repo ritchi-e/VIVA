@@ -1,6 +1,7 @@
 from django.db import models
 
 from common.models import SoftDeleteModel, UUIDModel
+from courses.join_codes import allocate_join_code
 
 
 class Course(UUIDModel, SoftDeleteModel):
@@ -10,6 +11,12 @@ class Course(UUIDModel, SoftDeleteModel):
     description = models.TextField(blank=True)
     term = models.CharField(max_length=64, blank=True)
     is_active = models.BooleanField(default=True)
+    join_code = models.CharField(
+        max_length=16,
+        unique=True,
+        db_index=True,
+        help_text="Shareable code students use to join this course (Classroom-style).",
+    )
     created_by = models.ForeignKey(
         "accounts.User",
         on_delete=models.SET_NULL,
@@ -24,6 +31,17 @@ class Course(UUIDModel, SoftDeleteModel):
 
     def __str__(self):
         return f"{self.code} — {self.title}"
+
+    def ensure_join_code(self, *, force: bool = False) -> str:
+        if self.join_code and not force:
+            return self.join_code
+        self.join_code = allocate_join_code(model=type(self))
+        return self.join_code
+
+    def save(self, *args, **kwargs):
+        if not self.join_code:
+            self.join_code = allocate_join_code(model=type(self))
+        super().save(*args, **kwargs)
 
 
 class CourseEnrollment(UUIDModel, SoftDeleteModel):

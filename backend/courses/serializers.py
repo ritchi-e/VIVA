@@ -15,11 +15,19 @@ class CourseSerializer(serializers.ModelSerializer):
             "description",
             "term",
             "is_active",
+            "join_code",
             "created_by",
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "organization", "created_by", "created_at", "updated_at")
+        read_only_fields = (
+            "id",
+            "organization",
+            "join_code",
+            "created_by",
+            "created_at",
+            "updated_at",
+        )
 
 
 class CourseEnrollmentSerializer(serializers.ModelSerializer):

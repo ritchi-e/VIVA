@@ -38,7 +38,21 @@ export interface Course {
   description: string
   term: string
   is_active: boolean
+  join_code: string
+  organization?: string
   created_at?: string
+}
+
+export interface CourseEnrollment {
+  id: string
+  course: string
+  role: string
+  created_at?: string
+  user: {
+    id: string
+    email: string
+    full_name?: string
+  }
 }
 
 export interface Assignment {
@@ -479,6 +493,18 @@ export interface DashboardRecentSession {
   integrity_terminated?: boolean
 }
 
+export interface UpcomingAssignmentProgress {
+  id: string
+  title: string
+  course_id: string
+  course_code: string
+  course_title: string
+  due_at: string | null
+  students_assigned: number
+  submissions_count: number
+  booked_slots_count: number
+}
+
 export interface DashboardMetrics {
   courses_count: number
   assignments_count: number
@@ -499,6 +525,7 @@ export interface DashboardMetrics {
   assessment_distribution: { status: string; count: number }[]
   students_requiring_review: number
   recent_sessions: DashboardRecentSession[]
+  upcoming_assignments?: UpcomingAssignmentProgress[]
   sessions_by_day?: { date: string | null; completed: number; failed: number; total: number }[]
   scores_by_week?: { week: string | null; average: number | null; count: number }[]
   score_buckets?: { bucket: string; count: number }[]

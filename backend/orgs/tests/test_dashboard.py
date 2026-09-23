@@ -48,6 +48,7 @@ class DashboardApiTests(TestCase):
         self.assertEqual(response.data["students_count"], 1)
         self.assertEqual(len(response.data["recent_sessions"]), 1)
         self.assertEqual(response.data["recent_sessions"][0]["student_name"], "Student One")
+        self.assertIn("upcoming_assignments", response.data)
         self.assertIn("sessions_by_day", response.data)
         self.assertIn("score_buckets", response.data)
         self.assertIn("by_assignment", response.data)

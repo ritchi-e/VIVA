@@ -27,7 +27,7 @@ export function LoginPage() {
     setError(null)
     try {
       await login({ email, password })
-      navigate('/', { replace: true })
+      navigate(from ?? '/', { replace: true })
     } catch (err) {
       setError(getApiErrorMessage(err))
     } finally {
@@ -82,7 +82,7 @@ export function LoginPage() {
                 setLoading(true)
                 setError(null)
                 void loginWithGoogle({ credential })
-                  .then(() => navigate('/', { replace: true }))
+                  .then(() => navigate(from ?? '/', { replace: true }))
                   .catch((err) => setError(getApiErrorMessage(err)))
                   .finally(() => setLoading(false))
               }}

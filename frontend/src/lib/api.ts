@@ -6,6 +6,7 @@ import type {
   AuthTokens,
   CoverageRow,
   Course,
+  CourseEnrollment,
   DashboardMetrics,
   EvidenceDashboard,
   EvidenceFlag,
@@ -180,6 +181,16 @@ export const coursesApi = {
   list: () => api.get<Paginated<Course> | Course[]>('/courses/').then((r) => unwrapList(r.data)),
   get: (id: string) => api.get<Course>(`/courses/${id}/`),
   create: (data: Partial<Course> & { code: string; title: string }) => api.post<Course>('/courses/', data),
+  enrollments: (id: string) =>
+    api.get<CourseEnrollment[]>(`/courses/${id}/enrollments/`).then((r) => (Array.isArray(r.data) ? r.data : [])),
+  join: (code: string) =>
+    api.post<{
+      course: Course
+      organization_id: string
+      organization_name: string
+      already_enrolled: boolean
+    }>('/courses/join/', { code }),
+  regenerateJoinCode: (id: string) => api.post<Course>(`/courses/${id}/regenerate-join-code/`),
 }
 
 export const assignmentsApi = {
@@ -248,7 +259,7 @@ export const rubricsApi = {
 }
 
 export const submissionsApi = {
-  list: (params?: { assignment?: string; student?: string }) =>
+  list: (params?: { assignment?: string; student?: string; course?: string }) =>
     api
       .get<Paginated<Submission> | Submission[]>('/submissions/', { params })
       .then((r) => unwrapList(r.data)),
